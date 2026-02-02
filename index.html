@@ -284,17 +284,186 @@
                         </div>
                     </section>
 
-                    <!-- Step 5: Options -->
+                                        <!-- Step 5: Options -->
                     <section class="step hidden" data-step="5">
                         <h2 class="step__title">Additional Options</h2>
                         <p class="step__desc">Customize your deck with additional features.</p>
-
+                        
                         <div class="form-group">
                             <div class="checkbox-toggle">
                                 <input type="checkbox" id="showRailings">
                                 <label for="showRailings">Add railings to visualization</label>
                             </div>
                             <p class="form-hint">Railings are for visualization only and not included in the estimate.</p>
+                        </div>
+                    
+                        <!-- Stair Configuration -->
+                        <div class="form-group stair-config-group">
+                            <div class="checkbox-toggle">
+                                <input type="checkbox" id="enableStairs">
+                                <label for="enableStairs">Add stairs to deck</label>
+                            </div>
+                            <p class="form-hint">Configure stairs for deck access. Requires deck height of at least 1 ft.</p>
+                        </div>
+                    
+                        <!-- Deck Too Low Warning -->
+                        <div class="stair-warning hidden" id="stairWarning">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <span>Deck height must be at least 1 ft for stairs.</span>
+                        </div>
+                    
+                        <div class="stair-panel hidden" id="stairPanel">
+                            
+                            <!-- Stair List -->
+                            <div class="stair-list" id="stairList">
+                                <div class="stair-list-empty">
+                                    <p>No stairs added yet. Click an edge button below to add stairs.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Add Stair Controls -->
+                            <div class="stair-add-controls">
+                                <span class="stair-add-label">Add stairs to:</span>
+                                <div class="stair-edge-buttons">
+                                    <button type="button" class="stair-edge-btn" data-edge="front">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 19V5M5 12l7-7 7 7"/>
+                                        </svg>
+                                        Front
+                                    </button>
+                                    <button type="button" class="stair-edge-btn" data-edge="back">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 5v14M5 12l7 7 7-7"/>
+                                        </svg>
+                                        Back
+                                    </button>
+                                    <button type="button" class="stair-edge-btn" data-edge="left">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M19 12H5M12 5l-7 7 7 7"/>
+                                        </svg>
+                                        Left
+                                    </button>
+                                    <button type="button" class="stair-edge-btn" data-edge="right">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                                        </svg>
+                                        Right
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Active Stair Editor (shown when stair selected) -->
+                            <div class="stair-editor hidden" id="stairEditor">
+                                <h4 class="stair-editor-title">
+                                    Edit Stair: <span id="stairEditorEdge"></span>
+                                </h4>
+                                
+                                <!-- Width -->
+                                <div class="form-group">
+                                    <label class="form-label">Stair Width (feet)</label>
+                                    <div class="slider-input">
+                                        <input type="range" id="stairWidthSlider" class="slider" min="2" max="8" value="4" step="0.5">
+                                        <input type="number" id="stairWidthInput" class="number-input" min="2" max="8" value="4" step="0.5">
+                                        <span class="unit">ft</span>
+                                    </div>
+                                    <p class="form-hint">Standard stair width is 4 feet. Minimum 36" for code compliance.</p>
+                                </div>
+                                
+                                <!-- Boards Per Tread -->
+                                <div class="form-group">
+                                    <label class="form-label">Boards Per Tread</label>
+                                    <div class="radio-cards radio-cards--inline">
+                                        <label class="radio-card radio-card--small">
+                                            <input type="radio" name="boardsPerTread" value="1">
+                                            <span>1</span>
+                                        </label>
+                                        <label class="radio-card radio-card--small selected">
+                                            <input type="radio" name="boardsPerTread" value="2" checked>
+                                            <span>2</span>
+                                        </label>
+                                        <label class="radio-card radio-card--small">
+                                            <input type="radio" name="boardsPerTread" value="3">
+                                            <span>3</span>
+                                        </label>
+                                    </div>
+                                    <p class="form-hint">More boards create deeper treads. 2 boards is standard.</p>
+                                </div>
+                                
+                                <!-- Tread Depth Display -->
+                                <div class="stair-info-card" id="treadDepthCard">
+                                    <div class="stair-info-row">
+                                        <span class="stair-info-label">Tread Depth:</span>
+                                        <span class="stair-info-value" id="treadDepthDisplay">11"</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Shape -->
+                                <div class="form-group">
+                                    <label class="form-label">Stair Shape</label>
+                                    <div class="radio-cards radio-cards--inline">
+                                        <label class="radio-card radio-card--small selected">
+                                            <input type="radio" name="stairShape" value="straight" checked>
+                                            <span>Straight</span>
+                                        </label>
+                                        <label class="radio-card radio-card--small">
+                                            <input type="radio" name="stairShape" value="l-shaped">
+                                            <span>L-Shaped</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- L-Shape Turn Direction (hidden by default) -->
+                                <div class="form-group hidden" id="turnDirectionGroup">
+                                    <label class="form-label">Turn Direction</label>
+                                    <div class="radio-cards radio-cards--inline">
+                                        <label class="radio-card radio-card--small selected">
+                                            <input type="radio" name="turnDirection" value="left" checked>
+                                            <span>Turn Left</span>
+                                        </label>
+                                        <label class="radio-card radio-card--small">
+                                            <input type="radio" name="turnDirection" value="right">
+                                            <span>Turn Right</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Handrails -->
+                                <div class="form-group">
+                                    <div class="checkbox-toggle">
+                                        <input type="checkbox" id="stairHandrails" checked>
+                                        <label for="stairHandrails">Include handrails on stairs</label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Calculated Info -->
+                                <div class="stair-info-card" id="stairInfoCard">
+                                    <div class="stair-info-header">
+                                        <span>Calculated Dimensions</span>
+                                    </div>
+                                    <div class="stair-info-row">
+                                        <span class="stair-info-label">Number of Steps:</span>
+                                        <span class="stair-info-value" id="stairStepCount">4</span>
+                                    </div>
+                                    <div class="stair-info-row">
+                                        <span class="stair-info-label">Total Run:</span>
+                                        <span class="stair-info-value" id="stairTotalRun">3.5 ft</span>
+                                    </div>
+                                    <div class="stair-info-row">
+                                        <span class="stair-info-label">Rise per Step:</span>
+                                        <span class="stair-info-value" id="stairRisePerStep">7.5"</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Delete Button -->
+                                <button type="button" class="btn btn--danger btn--small" id="deleteStairBtn" style="width: 100%; margin-top: var(--spacing-md);">
+                                    Remove This Stair
+                                </button>
+                            </div>
+                            
                         </div>
                     </section>
 
