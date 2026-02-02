@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrueGrain Deck Designer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div class="deck-designer">
+        <!-- Header -->
+        <header class="header">
+            <div class="header__logo">
+                <img src="images/truegrain-logo.png" alt="TrueGrain" class="header__logo-image" onerror="this.style.display='none'">
+            </div>
+            <button class="header__help-btn" aria-label="Help">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </button>
+        </header>
+
+        <main class="main">
+            <!-- Wizard Panel -->
+            <aside class="wizard-panel">
+                <!-- Progress Navigation -->
+                <nav class="progress-nav">
+                    <div class="progress-step active" data-step="1">
+                        <span class="progress-step__number">1</span>
+                        <span class="progress-step__label">Size</span>
+                    </div>
+                    <div class="progress-step" data-step="2">
+                        <span class="progress-step__number">2</span>
+                        <span class="progress-step__label">Structure</span>
+                    </div>
+                    <div class="progress-step" data-step="3">
+                        <span class="progress-step__number">3</span>
+                        <span class="progress-step__label">Pattern</span>
+                    </div>
+                    <div class="progress-step" data-step="4">
+                        <span class="progress-step__number">4</span>
+                        <span class="progress-step__label">Color</span>
+                    </div>
+                    <div class="progress-step" data-step="5">
+                        <span class="progress-step__number">5</span>
+                        <span class="progress-step__label">Options</span>
+                    </div>
+                    <div class="progress-step" data-step="6">
+                        <span class="progress-step__number">6</span>
+                        <span class="progress-step__label">Estimate</span>
+                    </div>
+                    <div class="progress-step" data-step="7">
+                        <span class="progress-step__number">7</span>
+                        <span class="progress-step__label">Review</span>
+                    </div>
+                </nav>
+
+                <!-- Step Content -->
+                <div class="step-content">
+                    <!-- Step 1: Dimensions -->
+                    <section class="step" data-step="1">
+                        <h2 class="step__title">Deck Dimensions</h2>
+                        <p class="step__desc">Enter the length and width of your deck in feet.</p>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                </svg>
+                                Length (feet)
+                            </label>
+                            <div class="slider-input">
+                                <input type="range" id="lengthSlider" class="slider" min="8" max="40" value="16" step="1">
+                                <input type="number" id="lengthInput" class="number-input" min="8" max="40" value="16">
+                                <span class="unit">ft</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                </svg>
+                                Width (feet)
+                            </label>
+                            <div class="slider-input">
+                                <input type="range" id="widthSlider" class="slider" min="8" max="30" value="12" step="1">
+                                <input type="number" id="widthInput" class="number-input" min="8" max="30" value="12">
+                                <span class="unit">ft</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="2" x2="12" y2="22"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                                Deck Height (feet)
+                            </label>
+                            <div class="slider-input">
+                                <input type="range" id="heightSlider" class="slider" min="0.5" max="8" value="2" step="0.5">
+                                <input type="number" id="heightInput" class="number-input" min="0.5" max="8" value="2" step="0.5">
+                                <span class="unit">ft</span>
+                            </div>
+                            <p class="form-hint">Height from ground to deck surface</p>
+                        </div>
+
+                        <div class="info-card">
+                            <span class="info-card__icon">📐</span>
+                            <div class="info-card__content">
+                                <span class="info-card__label">Total Area</span>
+                                <span class="info-card__value" id="totalArea">192 sq ft</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Step 2: Structure -->
+                    <section class="step hidden" data-step="2">
+                        <h2 class="step__title">Structure Options</h2>
+                        <p class="step__desc">Configure how your boards will be installed.</p>
+
+                        <div class="form-group">
+                            <label class="form-label">Board Direction</label>
+                            <div class="direction-toggle">
+                                <button class="direction-btn selected" data-direction="length">
+                                    <svg class="direction-icon" viewBox="0 0 60 40">
+                                        <rect x="2" y="4" width="56" height="6" rx="1" fill="currentColor"></rect>
+                                        <rect x="2" y="14" width="56" height="6" rx="1" fill="currentColor"></rect>
+                                        <rect x="2" y="24" width="56" height="6" rx="1" fill="currentColor"></rect>
+                                        <rect x="2" y="34" width="56" height="3" rx="1" fill="currentColor"></rect>
+                                    </svg>
+                                    <span>Lengthwise</span>
+                                </button>
+                                <button class="direction-btn" data-direction="width">
+                                    <svg class="direction-icon" viewBox="0 0 60 40">
+                                        <rect x="4" y="2" width="6" height="36" rx="1" fill="currentColor"></rect>
+                                        <rect x="14" y="2" width="6" height="36" rx="1" fill="currentColor"></rect>
+                                        <rect x="24" y="2" width="6" height="36" rx="1" fill="currentColor"></rect>
+                                        <rect x="34" y="2" width="6" height="36" rx="1" fill="currentColor"></rect>
+                                        <rect x="44" y="2" width="6" height="36" rx="1" fill="currentColor"></rect>
+                                        <rect x="54" y="2" width="3" height="36" rx="1" fill="currentColor"></rect>
+                                    </svg>
+                                    <span>Widthwise</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Joist Spacing</label>
+                            <div class="radio-cards radio-cards--inline">
+                                <label class="radio-card radio-card--small selected">
+                                    <input type="radio" name="joistSpacing" value="16" checked>
+                                    <span>16" O.C.</span>
+                                </label>
+                                <label class="radio-card radio-card--small">
+                                    <input type="radio" name="joistSpacing" value="12">
+                                    <span>12" O.C.</span>
+                                </label>
+                            </div>
+                            <p class="form-hint">Standard is 16" on center. Use 12" for diagonal patterns or extra support.</p>
+                        </div>
+                    </section>
+
+                    <!-- Step 3: Pattern -->
+                    <section class="step hidden" data-step="3">
+                        <h2 class="step__title">Board Pattern</h2>
+                        <p class="step__desc">Choose a pattern for your deck boards.</p>
+
+                        <div class="pattern-alert hidden" id="breakerAlert">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <div>
+                                <strong>Breaker Board Recommended</strong>
+                                <p>Your deck is over 20 feet. A breaker board will reduce waste and create a cleaner look.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="pattern-cards">
+                                <div class="pattern-card selected" data-pattern="straight">
+                                    <input type="radio" name="pattern" value="straight" checked>
+                                    <div class="pattern-card__preview">
+                                        <svg viewBox="0 0 100 60">
+                                            <rect x="5" y="5" width="90" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="5" y="17" width="90" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="5" y="29" width="90" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="5" y="41" width="90" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="5" y="53" width="90" height="4" rx="1" fill="currentColor"></rect>
+                                        </svg>
+                                    </div>
+                                    <span class="pattern-card__title">Straight</span>
+                                    <span class="pattern-card__desc">Classic look</span>
+                                </div>
+
+                                <div class="pattern-card" data-pattern="breaker">
+                                    <input type="radio" name="pattern" value="breaker">
+                                    <div class="pattern-card__preview">
+                                        <svg viewBox="0 0 100 60">
+                                            <rect x="5" y="5" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="55" y="5" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="5" y="17" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="55" y="17" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="5" y="29" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="55" y="29" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="5" y="41" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="55" y="41" width="40" height="8" rx="1" fill="currentColor"></rect>
+                                            <rect x="47" y="5" width="6" height="44" rx="1" fill="currentColor" opacity="0.6"></rect>
+                                        </svg>
+                                    </div>
+                                    <span class="pattern-card__title">Breaker</span>
+                                    <span class="pattern-card__desc">With center board</span>
+                                </div>
+
+                                <div class="pattern-card" data-pattern="picture-frame">
+                                    <input type="radio" name="pattern" value="picture-frame">
+                                    <div class="pattern-card__preview">
+                                        <svg viewBox="0 0 100 60">
+                                            <rect x="5" y="5" width="90" height="6" rx="1" fill="currentColor" opacity="0.6"></rect>
+                                            <rect x="5" y="49" width="90" height="6" rx="1" fill="currentColor" opacity="0.6"></rect>
+                                            <rect x="5" y="11" width="6" height="38" rx="1" fill="currentColor" opacity="0.6"></rect>
+                                            <rect x="89" y="11" width="6" height="38" rx="1" fill="currentColor" opacity="0.6"></rect>
+                                            <rect x="14" y="14" width="72" height="5" rx="1" fill="currentColor"></rect>
+                                            <rect x="14" y="22" width="72" height="5" rx="1" fill="currentColor"></rect>
+                                            <rect x="14" y="30" width="72" height="5" rx="1" fill="currentColor"></rect>
+                                            <rect x="14" y="38" width="72" height="5" rx="1" fill="currentColor"></rect>
+                                        </svg>
+                                    </div>
+                                    <span class="pattern-card__title">Picture Frame</span>
+                                    <span class="pattern-card__desc">Border accent</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="borderWidthGroup" style="display: none;">
+                            <label class="form-label">Border Width (boards)</label>
+                            <div class="slider-input">
+                                <input type="range" id="borderWidthSlider" class="slider" min="1" max="3" value="1" step="1">
+                                <input type="number" id="borderWidthInput" class="number-input" min="1" max="3" value="1">
+                            </div>
+                        </div>
+
+                        <!-- Breaker Color Group (hidden by default) -->
+                        <div class="form-group hidden" id="breakerColorGroup">
+                            <div class="checkbox-toggle">
+                                <input type="checkbox" id="breakerSameColor" checked>
+                                <label for="breakerSameColor">Use same color for breaker board</label>
+                            </div>
+                            <div id="breakerColorSwatchesContainer" style="display: none;">
+                                <label class="form-label">Breaker Board Color</label>
+                                <div class="color-swatches" id="breakerColorSwatches"></div>
+                            </div>
+                        </div>
+
+                        <!-- Picture Frame Options (hidden by default) -->
+                        <div class="form-group hidden" id="pictureFrameOptions">
+                            <div class="checkbox-toggle">
+                                <input type="checkbox" id="borderSameColor" checked>
+                                <label for="borderSameColor">Use same color for border</label>
+                            </div>
+                            <div id="borderColorSwatchesContainer" style="display: none;">
+                                <label class="form-label">Border Color</label>
+                                <div class="color-swatches" id="borderColorSwatches"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Step 4: Color -->
+                    <section class="step hidden" data-step="4">
+                        <h2 class="step__title">Select Color</h2>
+                        <p class="step__desc">Choose from our premium TrueGrain colors.</p>
+
+                        <div class="form-group">
+                            <label class="form-label">Main Board Color</label>
+                            <div class="color-swatches" id="mainColorSwatches"></div>
+                        </div>
+                    </section>
+
+                    <!-- Step 5: Options -->
+                    <section class="step hidden" data-step="5">
+                        <h2 class="step__title">Additional Options</h2>
+                        <p class="step__desc">Customize your deck with additional features.</p>
+
+                        <div class="form-group">
+                            <div class="checkbox-toggle">
+                                <input type="checkbox" id="showRailings">
+                                <label for="showRailings">Add railings to visualization</label>
+                            </div>
+                            <p class="form-hint">Railings are for visualization only and not included in the estimate.</p>
+                        </div>
+                    </section>
+
+                    <!-- Step 6: Estimate -->
+                    <section class="step hidden" data-step="6">
+                        <h2 class="step__title">Material Estimate</h2>
+                        <p class="step__desc">Review your estimated materials and costs.</p>
+
+                        <div class="form-group">
+                            <label class="form-label">Waste Factor</label>
+                            <div class="slider-input">
+                                <input type="range" id="wasteSlider" class="slider" min="5" max="20" value="10" step="1">
+                                <input type="number" id="wasteInput" class="number-input" min="5" max="20" value="10">
+                                <span class="unit">%</span>
+                            </div>
+                            <p class="form-hint">Industry standard is 10%. Increase for complex patterns.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="checkbox-toggle">
+                                <input type="checkbox" id="includeLaborEstimate">
+                                <label for="includeLaborEstimate">Include labor estimate</label>
+                            </div>
+                        </div>
+
+                        <!-- Optimization Card -->
+                        <div class="optimization-card">
+                            <div class="optimization-card__header">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 20V10"></path>
+                                    <path d="M18 20V4"></path>
+                                    <path d="M6 20v-4"></path>
+                                </svg>
+                                <span>Board Length Optimization</span>
+                            </div>
+                            <div class="optimization-card__content" id="optimizationContent">
+                                <p style="color: var(--color-text-muted); font-size: var(--font-size-sm)">Calculating optimal board layout...</p>
+                            </div>
+                        </div>
+
+                        <!-- Board Breakdown Card -->
+                        <div class="board-breakdown-card">
+                            <div class="board-breakdown-card__header">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                                    <line x1="3" y1="15" x2="21" y2="15"></line>
+                                </svg>
+                                <span>Board Breakdown by Length</span>
+                            </div>
+                            <div class="board-breakdown-card__content" id="boardBreakdownContent">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Board Length Legend -->
+                        <div class="board-legend" id="boardLegend">
+                            <span class="board-legend__title">3D View Legend:</span>
+                            <div class="board-legend__items">
+                                <span class="board-legend__item"><span class="board-legend__color len-12"></span>12' boards</span>
+                                <span class="board-legend__item"><span class="board-legend__color len-16"></span>16' boards</span>
+                                <span class="board-legend__item"><span class="board-legend__color len-20"></span>20' boards</span>
+                            </div>
+                        </div>
+
+                        <div class="estimate-summary" id="estimateSummary"></div>
+                    </section>
+
+                    <!-- Step 7: Review & Export -->
+                    <section class="step hidden" data-step="7">
+                        <h2 class="step__title">Review & Export</h2>
+                        <p class="step__desc">Review your design and download your estimate.</p>
+
+                        <div class="review-summary" id="reviewSummary"></div>
+
+                        <div class="contact-form">
+                            <h3 class="contact-form__title">Get a Quote</h3>
+                            <p class="contact-form__desc">Enter your information to receive an accurate quote from a local dealer.</p>
+
+                            <div class="form-group">
+                                <label class="form-label">Name</label>
+                                <input type="text" id="contactName" class="text-input" placeholder="Your name">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Email</label>
+                                <input type="email" id="contactEmail" class="text-input" placeholder="you@email.com">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Phone</label>
+                                    <input type="tel" id="contactPhone" class="text-input" placeholder="555-123-4567">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">ZIP Code</label>
+                                    <input type="text" id="contactZip" class="text-input" placeholder="12345">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="export-actions" id="exportActions">
+                            <button class="btn btn--primary btn--large" id="emailMyselfBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                                Email Quote to Myself
+                            </button>
+                            <button class="btn btn--success btn--large" id="submitToSalesBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 2L11 13"></path>
+                                    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                                </svg>
+                                Submit to Sales Team
+                            </button>
+                            <button class="btn btn--secondary btn--large" id="downloadPdfBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Download PDF
+                            </button>
+                        </div>
+
+                        <!-- Success Message Container -->
+                        <div class="quote-success-message hidden" id="quoteSuccessMessage">
+                            <!-- Populated by JavaScript when email is sent -->
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Wizard Navigation -->
+                <div class="wizard-nav">
+                    <button class="btn btn--secondary" id="prevBtn" disabled>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        Back
+                    </button>
+                    <button class="btn btn--primary" id="nextBtn">
+                        Next
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Visualization Panel -->
+            <section class="visualization-panel">
+                <!-- View Controls -->
+                <div class="view-controls">
+                    <button class="view-btn selected" data-view="3d">3D View</button>
+                    <button class="view-btn" data-view="top">Top Down</button>
+                </div>
+
+                <!-- 3D Scene -->
+                <div class="scene-container" id="sceneContainer">
+                    <canvas id="deckCanvas"></canvas>
+                    <div class="scene-loading" id="sceneLoading">
+                        <div class="spinner"></div>
+                        <span>Loading visualization...</span>
+                    </div>
+                    <div class="building-spinner hidden" id="buildingSpinner">
+                        <div class="spinner"></div>
+                        <p>Updating design...</p>
+                    </div>
+                </div>
+
+                <!-- Scene Controls -->
+                <div class="scene-controls">
+                    <button class="scene-control-btn" id="zoomInBtn" aria-label="Zoom In">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="11" y1="8" x2="11" y2="14"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                    <button class="scene-control-btn" id="zoomOutBtn" aria-label="Zoom Out">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                    <button class="scene-control-btn" id="resetViewBtn" aria-label="Reset View">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                            <path d="M3 3v5h5"></path>
+                        </svg>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Mobile View Toggle -->
+        <button class="mobile-view-toggle mobile-hidden-btn" id="mobileViewToggle">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            View 3D
+        </button>
+    </div>
+
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Main Application -->
+    <script src="app.js"></script>
+</body>
+</html>
