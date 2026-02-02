@@ -1767,10 +1767,23 @@ function executeBuildDeck() {
             }
         }
 
-        // Create stairs if enabled
-        if (state.stairsEnabled && state.stairs && state.stairs.length > 0 && window.stair3DFunctions) {
-            window.stair3DFunctions.createStairs();
+                // Create stairs if enabled
+        if (state.stairsEnabled && state.stairs && state.stairs.length > 0) {
+            // Ensure stair group is initialized first
+            if (typeof initStairGroup === 'function') {
+                initStairGroup();
+            } else if (window.stair3DFunctions && window.stair3DFunctions.initStairGroup) {
+                window.stair3DFunctions.initStairGroup();
+            }
+            
+            // Now create the stairs
+            if (typeof createStairs === 'function') {
+                createStairs();
+            } else if (window.stair3DFunctions && window.stair3DFunctions.createStairs) {
+                window.stair3DFunctions.createStairs();
+            }
         }
+
 
         controls.target.set(0, state.deckHeight, 0);
         const maxDim = Math.max(state.deckLength, state.deckWidth);
@@ -4267,13 +4280,25 @@ function setupStairEventListeners() {
         });
     }
 
-    // Add stair buttons (one for each edge)
     document.querySelectorAll('.stair-edge-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const edge = e.target.dataset.edge;
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Use 'this' to reference the button itself, not e.target
+        // This ensures we get the data-edge even if user clicks on icon inside button
+        const edge = this.getAttribute('data-edge') || this.dataset.edge;
+        
+        console.log('Stair button clicked, edge:', edge);  // Debug line
+        
+        if (edge) {
             onAddStairClick(edge);
-        });
+        } else {
+            console.error('No edge found on button:', this);
+        }
     });
+});
+
 
     // Delete stair button
     const deleteStairBtn = document.getElementById('deleteStairBtn');
