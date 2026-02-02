@@ -2891,25 +2891,26 @@ function createStairLanding(stairConfig, dims, parentGroup, colorConfig) {
         parentGroup.add(board);
     }
 
-    // Landing support frame (simple box for now)
-    const frameMaterial = createStringerMaterial();
-    const frameGeometry = new THREE.BoxGeometry(
-        landingWidth,
-        landingY,
-        landingDepth
-    );
+    // Landing support posts (4 corner posts instead of solid block)
+    const postMaterial = createStringerMaterial();
+    const postSize = 0.33;  // Same as deck support posts
+    const postGeometry = new THREE.BoxGeometry(postSize, landingY, postSize);
+    
+    const postPositions = [
+        { x: -landingWidth/2 + postSize/2, z: landingZ - landingDepth/2 + postSize/2 },
+        { x: landingWidth/2 - postSize/2, z: landingZ - landingDepth/2 + postSize/2 },
+        { x: -landingWidth/2 + postSize/2, z: landingZ + landingDepth/2 - postSize/2 },
+        { x: landingWidth/2 - postSize/2, z: landingZ + landingDepth/2 - postSize/2 }
+    ];
+    
+    postPositions.forEach(pos => {
+        const post = new THREE.Mesh(postGeometry, postMaterial);
+        post.position.set(pos.x, landingY / 2, pos.z);
+        post.castShadow = true;
+        post.receiveShadow = true;
+        parentGroup.add(post);
+    });
 
-    const frame = new THREE.Mesh(frameGeometry, frameMaterial);
-    frame.position.set(0, landingY / 2, landingZ);
-    frame.castShadow = true;
-    frame.receiveShadow = true;
-
-    // Make frame semi-transparent or wireframe for better visualization
-    frame.material.transparent = true;
-    frame.material.opacity = 0.3;
-
-    parentGroup.add(frame);
-}
 
 /**
  * Create second flight of L-shaped stairs (landing to ground)
@@ -2967,14 +2968,32 @@ function createLShapedSecondFlight(stairConfig, dims, parentGroup, colorConfig, 
     }
 
     // Position and rotate second flight
-    flightGroup.rotation.y = turnDir * (Math.PI / 2);
-    flightGroup.position.set(
-        turnDir * (stairWidthFt / 2 + lData.run2Feet / 2),
-        0,
-        landingEndZ - stairWidthFt / 2
-    );
-
+    // Position and rotate second flight
+    // The second flight starts at the landing and goes perpendicular
+    const landingCenterZ = -lData.run1Feet - lData.landingDepthFeet / 2;
+    
+    // Rotate 90 degrees based on turn direction
+    flightGroup.rotation.y = turnDir * Math.PI / 2;
+    
+    // Position at the edge of the landing, turned 90 degrees
+    if (turnDir === -1) {
+        // Left turn
+        flightGroup.position.set(
+            -stairWidthFt / 2 - lData.run2Feet / 2,
+            0,
+            landingCenterZ
+        );
+    } else {
+        // Right turn
+        flightGroup.position.set(
+            stairWidthFt / 2 + lData.run2Feet / 2,
+            0,
+            landingCenterZ
+        );
+    }
+    
     parentGroup.add(flightGroup);
+
 }
 
 /**
