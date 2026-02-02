@@ -1594,3 +1594,354 @@ body {
         display: none;
     }
 }
+/* ============================================================================
+   AGENT 6: STAIR STYLES
+   ============================================================================
+   Add this CSS to the END of main.css
+   ============================================================================ */
+
+/* Stair Configuration Group */
+.stair-config-group {
+    margin-bottom: var(--spacing-md);
+}
+
+/* Stair Warning */
+.stair-warning {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 152, 0, 0.1) 100%);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: var(--border-radius);
+    color: #e65100;
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.stair-warning.hidden {
+    display: none;
+}
+
+.stair-warning svg {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}
+
+/* Stair Panel */
+.stair-panel {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--color-bg-secondary);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--color-border);
+}
+
+.stair-panel.hidden {
+    display: none;
+}
+
+/* Stair List */
+.stair-list {
+    margin-bottom: var(--spacing-md);
+}
+
+.stair-list-empty {
+    text-align: center;
+    padding: var(--spacing-lg);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.stair-list-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: white;
+    border: 2px solid var(--color-border);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.stair-list-item:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.stair-list-item.selected {
+    border-color: var(--color-primary);
+    background: linear-gradient(135deg, rgba(139, 90, 67, 0.05) 0%, rgba(139, 90, 67, 0.02) 100%);
+}
+
+.stair-list-item-edge {
+    flex-shrink: 0;
+}
+
+.stair-edge-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stair-edge-badge.front {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+}
+
+.stair-edge-badge.back {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+}
+
+.stair-edge-badge.left {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    color: white;
+}
+
+.stair-edge-badge.right {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    color: white;
+}
+
+.stair-list-item-info {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.stair-info-width,
+.stair-info-steps,
+.stair-info-shape {
+    padding: 2px 8px;
+    background: var(--color-bg-secondary);
+    border-radius: 4px;
+}
+
+.stair-list-item-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.stair-edit-btn,
+.stair-delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.stair-edit-btn:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+.stair-delete-btn:hover {
+    background: #f44336;
+    border-color: #f44336;
+    color: white;
+}
+
+/* Add Stair Controls */
+.stair-add-controls {
+    margin-bottom: var(--spacing-md);
+}
+
+.stair-add-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.stair-edge-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+}
+
+.stair-edge-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: white;
+    border: 2px solid var(--color-border);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.stair-edge-btn:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    background: linear-gradient(135deg, rgba(139, 90, 67, 0.05) 0%, rgba(139, 90, 67, 0.02) 100%);
+    transform: translateY(-1px);
+}
+
+.stair-edge-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Stair Editor */
+.stair-editor {
+    padding: var(--spacing-md);
+    background: white;
+    border-radius: var(--border-radius);
+    border: 2px solid var(--color-primary);
+    margin-top: var(--spacing-md);
+}
+
+.stair-editor.hidden {
+    display: none;
+}
+
+.stair-editor-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.stair-editor-title span {
+    color: var(--color-primary);
+    text-transform: capitalize;
+}
+
+/* Stair Info Card */
+.stair-info-card {
+    padding: var(--spacing-md);
+    background: linear-gradient(135deg, rgba(139, 90, 67, 0.05) 0%, rgba(139, 90, 67, 0.02) 100%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    margin: var(--spacing-md) 0;
+}
+
+.stair-info-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stair-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.stair-info-row:last-child {
+    border-bottom: none;
+}
+
+.stair-info-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.stair-info-value {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-family: 'Courier New', monospace;
+}
+
+/* Danger Button */
+.btn--danger {
+    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    color: white;
+    border: none;
+}
+
+.btn--danger:hover {
+    background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+/* Undo/Redo Controls */
+.undo-redo-controls {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+}
+
+.undo-btn,
+.redo-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.undo-btn:hover:not(:disabled),
+.redo-btn:hover:not(:disabled) {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.undo-btn:disabled,
+.redo-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .stair-edge-buttons {
+        grid-template-columns: 1fr;
+    }
+    
+    .stair-list-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .stair-list-item-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
