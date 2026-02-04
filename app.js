@@ -1541,7 +1541,27 @@ let contextLost = false;
 function initScene() {
     const container = document.getElementById('sceneContainer');
     const canvas = document.getElementById('deckCanvas');
-    if (!container || !canvas) return;
+    
+    // Error handling: show message if elements missing
+    if (!container || !canvas) {
+        console.error('initScene failed: container or canvas not found');
+        const loadingEl = document.getElementById('sceneLoading');
+        if (loadingEl) {
+            loadingEl.innerHTML = '<p style="color: #c00; padding: 20px;">Error: Canvas element not found. Please refresh the page.</p>';
+        }
+        return;
+    }
+    
+    // Check if Three.js loaded
+    if (typeof THREE === 'undefined') {
+        console.error('initScene failed: THREE.js not loaded');
+        const loadingEl = document.getElementById('sceneLoading');
+        if (loadingEl) {
+            loadingEl.innerHTML = '<p style="color: #c00; padding: 20px;">Error: 3D library failed to load. Check your internet connection and refresh.</p>';
+        }
+        return;
+    }
+
 
     canvas.addEventListener('webglcontextlost', (event) => {
         event.preventDefault();
@@ -1555,8 +1575,11 @@ function initScene() {
         initScene();
     });
 
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
+    try {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        // ... keep all existing code until the end of initScene
+
 
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.set(25, 20, 25);
@@ -1611,6 +1634,14 @@ function initScene() {
 
     window.addEventListener('resize', debounce(onWindowResize, 250));
     window.addEventListener('beforeunload', disposeAllCaches);
+    } catch (error) {
+        console.error('initScene error:', error);
+        const loadingEl = document.getElementById('sceneLoading');
+        if (loadingEl) {
+            loadingEl.innerHTML = '<p style="color: #c00; padding: 20px;">Error initializing 3D view: ' + error.message + '</p>';
+        }
+        sceneInitialized = false;
+    }
 }
 
 function createRealisticGrass() {
