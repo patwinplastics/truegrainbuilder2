@@ -32,9 +32,10 @@ function initializeApp() {
     // 4. Initialize stair subsystem
     initStairUI();
 
-    // 4b. Apply stair bug fixes (patches over app.js handlers)
+    // 4b. Apply bug fixes (patches over app.js handlers)
     patchStairToggleCleanup();
     patchBuildDeckStairCleanup();
+    patchExportButtons();
 
     // 5. Initialize stair drag after scene is ready
     if (sceneInitialized) {
@@ -424,6 +425,8 @@ function initSceneControls() {
 
 // ===================================================
 // EXPORT ACTIONS (Step 7)
+// Contact fields only. Button wiring is handled by
+// patchExportButtons() to prevent duplicate listeners.
 // ===================================================
 
 function initExportActions() {
@@ -444,61 +447,16 @@ function initExportActions() {
         }
     });
 
-    const emailMyselfBtn = document.getElementById('emailMyselfBtn');
-    if (emailMyselfBtn) {
-        emailMyselfBtn.addEventListener('click', () => handleEmailMyself());
-    }
-    const submitToSalesBtn = document.getElementById('submitToSalesBtn');
-    if (submitToSalesBtn) {
-        submitToSalesBtn.addEventListener('click', () => handleSubmitToSales());
-    }
-    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
-    if (downloadPdfBtn) {
-        downloadPdfBtn.addEventListener('click', () => handleDownloadPdf());
-    }
+    // NOTE: Button listeners are NOT attached here.
+    // patchExportButtons() handles them after app.js
+    // has already attached its own (to prevent dupes).
 }
 
 // ===================================================
 // EXPORT HANDLERS (safe fallbacks if not in app.js)
 // ===================================================
 
-if (typeof handleEmailMyself === 'undefined') {
-    function handleEmailMyself() {
-        const email = state.contactEmail;
-        if (!email || !email.includes('@')) {
-            alert('Please enter a valid email address.');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('email', email);
-        formData.append('name', state.contactName);
-        formData.append('phone', state.contactPhone);
-        formData.append('zip', state.contactZip);
-        formData.append('deckSize', state.deckLength + "' x " + state.deckWidth + "'");
-        formData.append('squareFootage', state.deckLength * state.deckWidth + ' sq ft');
-        formData.append('color', state.mainColor);
-        formData.append('pattern', state.pattern);
-        if (state.results) {
-            formData.append('totalBoards', state.results.boards.total);
-            formData.append('linealFeet', state.results.boards.linealFeet);
-            formData.append('estimateLow', '$' + state.results.costs.grandTotal.materialsOnly.low.toLocaleString());
-            formData.append('estimateHigh', '$' + state.results.costs.grandTotal.materialsOnly.high.toLocaleString());
-        }
-        fetch(CONFIG.formspreeEndpoint, {
-            method: 'POST', body: formData, headers: { 'Accept': 'application/json' }
-        }).then(response => {
-            const successMsg = document.getElementById('quoteSuccessMessage');
-            if (response.ok && successMsg) {
-                successMsg.classList.remove('hidden');
-                successMsg.innerHTML = '<div class="success-card"><h4>Quote Sent!</h4><p>Check your inbox at <strong>' + email + '</strong> for your deck estimate.</p></div>';
-            } else {
-                alert('There was an issue sending the quote. Please try again.');
-            }
-        }).catch(() => {
-            alert('Network error. Please check your connection and try again.');
-        });
-    }
-}
+// handleEmailMyself removed: feature no longer exposed in UI
 
 if (typeof handleSubmitToSales === 'undefined') {
     function handleSubmitToSales() {
@@ -611,7 +569,6 @@ if (typeof handleDownloadPdf === 'undefined') {
 
 function removeAllStairMeshes() {
     if (typeof scene === 'undefined' || !scene) return;
-    // Remove by name: stairGroup, stairMeshes, or any object with 'stair' in name
     const toRemove = [];
     scene.traverse((obj) => {
         if (obj.name && (obj.name === 'stairGroup' || obj.name.toLowerCase().includes('stair'))) {
@@ -619,7 +576,6 @@ function removeAllStairMeshes() {
         }
     });
     toRemove.forEach(obj => {
-        // Dispose geometry and materials to free GPU memory
         if (obj.geometry) {
             obj.geometry.dispose();
         }
@@ -645,11 +601,9 @@ function patchStairToggleCleanup() {
         return;
     }
 
-    // Clone and replace the checkbox to remove ALL previous listeners
     const newCheckbox = enableStairs.cloneNode(true);
     enableStairs.parentNode.replaceChild(newCheckbox, enableStairs);
 
-    // Sync checkbox with current state
     newCheckbox.checked = state.stairsEnabled || false;
 
     newCheckbox.addEventListener('change', (e) => {
@@ -658,9 +612,7 @@ function patchStairToggleCleanup() {
         const stairEditor = document.getElementById('stairEditor');
 
         if (e.target.checked) {
-            // Enable stairs
             if (state.deckHeight < 1) {
-                // Deck too low for stairs
                 e.target.checked = false;
                 if (stairWarning) stairWarning.classList.remove('hidden');
                 return;
@@ -669,30 +621,24 @@ function patchStairToggleCleanup() {
             if (stairPanel) stairPanel.classList.remove('hidden');
             updateState({ stairsEnabled: true });
         } else {
-            // Disable stairs: full cleanup
             console.log('Stair toggle OFF: clearing stairs from state and 3D scene');
 
-            // 1. Clear state
             state.stairsEnabled = false;
             state.stairs = [];
             state.selectedStairId = null;
             state.stairResults = null;
 
-            // 2. Hide UI panels
             if (stairPanel) stairPanel.classList.add('hidden');
             if (stairEditor) stairEditor.classList.add('hidden');
             if (stairWarning) stairWarning.classList.add('hidden');
 
-            // 3. Reset stair list UI to empty state
             const stairList = document.getElementById('stairList');
             if (stairList) {
                 stairList.innerHTML = '<div class="stair-list-empty"><p>No stairs added yet. Click an edge button below to add stairs.</p></div>';
             }
 
-            // 4. Remove 3D stair meshes
             removeAllStairMeshes();
 
-            // 5. Save and rebuild
             if (typeof saveState === 'function') saveState();
             if (typeof buildDeck === 'function') buildDeck();
         }
@@ -703,10 +649,6 @@ function patchStairToggleCleanup() {
 
 // ===================================================
 // BUGFIX: executeBuildDeck stair mesh cleanup
-// Wraps executeBuildDeck so stale stair meshes are
-// always removed before a rebuild, even if stairs
-// are still enabled (handles edge case of changing
-// stair config mid-build).
 // ===================================================
 
 function patchBuildDeckStairCleanup() {
@@ -718,13 +660,83 @@ function patchBuildDeckStairCleanup() {
     const _originalExecuteBuildDeck = executeBuildDeck;
 
     executeBuildDeck = function() {
-        // Always clean up old stair meshes before rebuilding
         removeAllStairMeshes();
-        // Call original build
         return _originalExecuteBuildDeck.apply(this, arguments);
     };
 
     console.log('patchBuildDeckStairCleanup: Applied');
+}
+
+// ===================================================
+// BUGFIX: Export button triple-fire fix
+// Clone/replaces submitToSalesBtn and downloadPdfBtn
+// to strip all duplicate listeners from app.js.
+// Also removes the emailMyselfBtn from the DOM.
+// Adds a submit-lock to prevent double-click.
+// ===================================================
+
+function patchExportButtons() {
+    // 1. Remove "Email Quote to Myself" button from DOM
+    const emailBtn = document.getElementById('emailMyselfBtn');
+    if (emailBtn) {
+        emailBtn.remove();
+        console.log('patchExportButtons: Removed emailMyselfBtn from DOM');
+    }
+
+    // 2. Clone/replace Submit to Sales button (strips all old listeners)
+    const salesBtn = document.getElementById('submitToSalesBtn');
+    if (salesBtn) {
+        const newSalesBtn = salesBtn.cloneNode(true);
+        salesBtn.parentNode.replaceChild(newSalesBtn, salesBtn);
+
+        let salesSubmitting = false;
+        newSalesBtn.addEventListener('click', () => {
+            if (salesSubmitting) {
+                console.log('Submit to Sales: already in progress, ignoring click');
+                return;
+            }
+            salesSubmitting = true;
+            newSalesBtn.disabled = true;
+            newSalesBtn.textContent = 'Submitting...';
+
+            // Use a timeout to re-enable after the fetch completes or 5s max
+            const reenableBtn = () => {
+                salesSubmitting = false;
+                newSalesBtn.disabled = false;
+                newSalesBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg> Submit to Sales Team';
+            };
+
+            try {
+                handleSubmitToSales();
+            } catch (err) {
+                console.error('handleSubmitToSales error:', err);
+            }
+
+            // Re-enable after 5 seconds (covers async fetch)
+            setTimeout(reenableBtn, 5000);
+        });
+
+        console.log('patchExportButtons: Replaced submitToSalesBtn with single listener + lock');
+    }
+
+    // 3. Clone/replace Download PDF button (strips all old listeners)
+    const pdfBtn = document.getElementById('downloadPdfBtn');
+    if (pdfBtn) {
+        const newPdfBtn = pdfBtn.cloneNode(true);
+        pdfBtn.parentNode.replaceChild(newPdfBtn, pdfBtn);
+
+        newPdfBtn.addEventListener('click', () => {
+            try {
+                handleDownloadPdf();
+            } catch (err) {
+                console.error('handleDownloadPdf error:', err);
+            }
+        });
+
+        console.log('patchExportButtons: Replaced downloadPdfBtn with single listener');
+    }
+
+    console.log('patchExportButtons: Applied');
 }
 
 // ===================================================
