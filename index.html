@@ -409,12 +409,92 @@
                                             <input type="radio" name="stairShape" value="straight" checked>
                                             <span>Straight</span>
                                         </label>
-                                
+                                        <label class="radio-card radio-card--small">
+                                            <input type="radio" name="stairShape" value="l-shape">
+                                            <span>L-Shape</span>
+                                        </label>
                                     </div>
                                 </div>
                                 
+                                <!-- L-Shape Options (hidden unless L-Shape selected) -->
+                                <div class="l-shape-options hidden" id="lShapeOptions">
+                                    
+                                    <!-- Turn Direction -->
+                                    <div class="form-group">
+                                        <label class="form-label">Turn Direction</label>
+                                        <p class="form-hint">Direction the stairs turn when climbing up.</p>
+                                        <div class="radio-cards radio-cards--inline">
+                                            <label class="radio-card radio-card--small">
+                                                <input type="radio" name="stairTurnDirection" value="left">
+                                                <span>
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 2px;">
+                                                        <path d="M15 18l-6-6 6-6"/>
+                                                    </svg>
+                                                    Turn Left
+                                                </span>
+                                            </label>
+                                            <label class="radio-card radio-card--small selected">
+                                                <input type="radio" name="stairTurnDirection" value="right" checked>
+                                                <span>
+                                                    Turn Right
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-left: 2px;">
+                                                        <path d="M9 18l6-6-6-6"/>
+                                                    </svg>
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Landing Depth -->
+                                    <div class="form-group">
+                                        <label class="form-label">Landing Depth (feet)</label>
+                                        <div class="slider-input">
+                                            <input type="range" id="landingDepthSlider" class="slider" min="3" max="6" value="3" step="0.5">
+                                            <input type="number" id="landingDepthInput" class="number-input" min="3" max="6" value="3" step="0.5">
+                                            <span class="unit">ft</span>
+                                        </div>
+                                        <p class="form-hint">Minimum 3 ft per building code (IRC R311.7.6). Larger landings are more comfortable.</p>
+                                    </div>
+
+                                    <!-- Landing Position -->
+                                    <div class="form-group">
+                                        <label class="form-label">Landing Position</label>
+                                        <div class="slider-input">
+                                            <input type="range" id="landingSplitSlider" class="slider" min="25" max="75" value="50" step="5">
+                                            <input type="number" id="landingSplitInput" class="number-input" min="25" max="75" value="50">
+                                            <span class="unit">%</span>
+                                        </div>
+                                        <p class="form-hint">Where the landing sits in the total rise. 50% = halfway up. Lower values mean fewer steps in the lower run.</p>
+                                    </div>
+
+                                    <!-- L-Shape Calculated Dimensions -->
+                                    <div class="stair-info-card" id="lShapeInfoCard">
+                                        <div class="stair-info-header">
+                                            <span>L-Shape Dimensions</span>
+                                        </div>
+                                        <div class="stair-info-row">
+                                            <span class="stair-info-label">Lower Run Steps:</span>
+                                            <span class="stair-info-value" id="lShapeLowerSteps">2</span>
+                                        </div>
+                                        <div class="stair-info-row">
+                                            <span class="stair-info-label">Upper Run Steps:</span>
+                                            <span class="stair-info-value" id="lShapeUpperSteps">2</span>
+                                        </div>
+                                        <div class="stair-info-row">
+                                            <span class="stair-info-label">Landing Height:</span>
+                                            <span class="stair-info-value" id="lShapeLandingHeight">1 ft</span>
+                                        </div>
+                                        <div class="stair-info-row">
+                                            <span class="stair-info-label">Lower Run Length:</span>
+                                            <span class="stair-info-value" id="lShapeLowerRun">1.75 ft</span>
+                                        </div>
+                                        <div class="stair-info-row">
+                                            <span class="stair-info-label">Upper Run Length:</span>
+                                            <span class="stair-info-value" id="lShapeUpperRun">1.75 ft</span>
+                                        </div>
+                                    </div>
+                                </div>
                                
-                                
                                 <!-- Handrails -->
                                 <div class="form-group">
                                     <div class="checkbox-toggle">
