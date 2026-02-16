@@ -2,7 +2,12 @@
 // APPLICATION INITIALIZATION
 // ===================================================
 
+let appInitialized = false;
+
 function initializeApp() {
+    if (appInitialized) return;
+    appInitialized = true;
+
     console.log('TrueGrain Deck Designer: Initializing...');
 
     // 1. Restore saved state
@@ -26,6 +31,10 @@ function initializeApp() {
 
     // 4. Initialize stair subsystem
     initStairUI();
+
+    // 4b. Apply stair bug fixes (patches over app.js handlers)
+    patchStairToggleCleanup();
+    patchBuildDeckStairCleanup();
 
     // 5. Initialize stair drag after scene is ready
     if (sceneInitialized) {
@@ -592,6 +601,130 @@ if (typeof handleDownloadPdf === 'undefined') {
         doc.text(CONFIG.companyInfo.phone + ' | ' + CONFIG.companyInfo.email, 20, y + 5);
         doc.save('TrueGrain-Deck-Estimate.pdf');
     }
+}
+
+// ===================================================
+// BUGFIX: Stair toggle cleanup (fixes #3)
+// Replaces the enableStairs checkbox handler so that
+// unchecking clears stairs from state AND 3D scene.
+// ===================================================
+
+function removeAllStairMeshes() {
+    if (typeof scene === 'undefined' || !scene) return;
+    // Remove by name: stairGroup, stairMeshes, or any object with 'stair' in name
+    const toRemove = [];
+    scene.traverse((obj) => {
+        if (obj.name && (obj.name === 'stairGroup' || obj.name.toLowerCase().includes('stair'))) {
+            toRemove.push(obj);
+        }
+    });
+    toRemove.forEach(obj => {
+        // Dispose geometry and materials to free GPU memory
+        if (obj.geometry) {
+            obj.geometry.dispose();
+        }
+        if (obj.material) {
+            if (Array.isArray(obj.material)) {
+                obj.material.forEach(m => m.dispose());
+            } else {
+                obj.material.dispose();
+            }
+        }
+        if (obj.parent) {
+            obj.parent.remove(obj);
+        } else {
+            scene.remove(obj);
+        }
+    });
+}
+
+function patchStairToggleCleanup() {
+    const enableStairs = document.getElementById('enableStairs');
+    if (!enableStairs) {
+        console.warn('patchStairToggleCleanup: enableStairs checkbox not found');
+        return;
+    }
+
+    // Clone and replace the checkbox to remove ALL previous listeners
+    const newCheckbox = enableStairs.cloneNode(true);
+    enableStairs.parentNode.replaceChild(newCheckbox, enableStairs);
+
+    // Sync checkbox with current state
+    newCheckbox.checked = state.stairsEnabled || false;
+
+    newCheckbox.addEventListener('change', (e) => {
+        const stairPanel = document.getElementById('stairPanel');
+        const stairWarning = document.getElementById('stairWarning');
+        const stairEditor = document.getElementById('stairEditor');
+
+        if (e.target.checked) {
+            // Enable stairs
+            if (state.deckHeight < 1) {
+                // Deck too low for stairs
+                e.target.checked = false;
+                if (stairWarning) stairWarning.classList.remove('hidden');
+                return;
+            }
+            if (stairWarning) stairWarning.classList.add('hidden');
+            if (stairPanel) stairPanel.classList.remove('hidden');
+            updateState({ stairsEnabled: true });
+        } else {
+            // Disable stairs: full cleanup
+            console.log('Stair toggle OFF: clearing stairs from state and 3D scene');
+
+            // 1. Clear state
+            state.stairsEnabled = false;
+            state.stairs = [];
+            state.selectedStairId = null;
+            state.stairResults = null;
+
+            // 2. Hide UI panels
+            if (stairPanel) stairPanel.classList.add('hidden');
+            if (stairEditor) stairEditor.classList.add('hidden');
+            if (stairWarning) stairWarning.classList.add('hidden');
+
+            // 3. Reset stair list UI to empty state
+            const stairList = document.getElementById('stairList');
+            if (stairList) {
+                stairList.innerHTML = '<div class="stair-list-empty"><p>No stairs added yet. Click an edge button below to add stairs.</p></div>';
+            }
+
+            // 4. Remove 3D stair meshes
+            removeAllStairMeshes();
+
+            // 5. Save and rebuild
+            if (typeof saveState === 'function') saveState();
+            if (typeof buildDeck === 'function') buildDeck();
+        }
+    });
+
+    console.log('patchStairToggleCleanup: Applied');
+}
+
+// ===================================================
+// BUGFIX: executeBuildDeck stair mesh cleanup
+// Wraps executeBuildDeck so stale stair meshes are
+// always removed before a rebuild, even if stairs
+// are still enabled (handles edge case of changing
+// stair config mid-build).
+// ===================================================
+
+function patchBuildDeckStairCleanup() {
+    if (typeof executeBuildDeck !== 'function') {
+        console.warn('patchBuildDeckStairCleanup: executeBuildDeck not found, skipping');
+        return;
+    }
+
+    const _originalExecuteBuildDeck = executeBuildDeck;
+
+    executeBuildDeck = function() {
+        // Always clean up old stair meshes before rebuilding
+        removeAllStairMeshes();
+        // Call original build
+        return _originalExecuteBuildDeck.apply(this, arguments);
+    };
+
+    console.log('patchBuildDeckStairCleanup: Applied');
 }
 
 // ===================================================
