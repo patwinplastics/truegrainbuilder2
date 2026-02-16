@@ -805,7 +805,7 @@ function calculateAllWithStairs() {
 
 // Replace calculateAll
 // Uncomment the line below after integrating:
-// calculateAll = calculateAllWithStairs;
+calculateAll = calculateAllWithStairs;
 
 // ===========================================
 // EXPORTS (for module systems) / GLOBAL ACCESS
