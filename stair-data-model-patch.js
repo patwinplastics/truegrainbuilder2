@@ -188,74 +188,13 @@
     };
 
     // ========================================================================
-    // PATCH 4: createStairs() - Remove shape:'straight' override so L-shaped
-    //          stairs actually render as L-shaped
+    // NOTE: PATCH 4 (createStairs override) has been REMOVED.
+    // The L-shape-aware createStairs() lives in stair-3d-lshape-patch.js
+    // which loads AFTER this file and correctly dispatches between straight
+    // and L-shaped rendering. The previous PATCH 4 here was overwriting
+    // that dispatcher with a straight-only renderer, preventing L-shape
+    // stairs from ever rendering.
     // ========================================================================
-
-    var originalCreateStairs = window.stair3DFunctions.createStairs;
-
-    window.stair3DFunctions.createStairs = function () {
-        if (!stairGroup) {
-            if (typeof initStairGroup === 'function') {
-                initStairGroup();
-            } else if (window.stair3DFunctions.initStairGroup) {
-                window.stair3DFunctions.initStairGroup();
-            }
-        } else {
-            if (typeof disposeStairGroup === 'function') {
-                disposeStairGroup();
-            } else if (window.stair3DFunctions.disposeStairGroup) {
-                window.stair3DFunctions.disposeStairGroup();
-            }
-            stairGroup = new THREE.Group();
-            stairGroup.name = 'stairGroup';
-            scene.add(stairGroup);
-        }
-
-        if (!state.stairsEnabled || state.stairs.length === 0) return;
-
-        var colorConfig = CONFIG.colors.find(function (c) { return c.id === state.mainColor; }) || CONFIG.colors[0];
-
-        for (var i = 0; i < state.stairs.length; i++) {
-            var stair = state.stairs[i];
-
-            // KEY CHANGE: Use stair directly instead of forcing shape:'straight'
-            var dims = window.stairFunctions.calculateStairDimensions(stair);
-            if (!dims.isValid) continue;
-
-            var stairMeshGroup = new THREE.Group();
-            stairMeshGroup.name = 'stair_' + stair.id;
-            stairMeshGroup.userData = { stairId: stair.id, type: 'stair' };
-
-            // Create stair components (straight for now; L-shaped 3D geometry
-            // will be added in Agent 2 L-shape patch - for this patch we just
-            // stop forcing straight so the DATA MODEL is correct)
-            if (typeof createStairStringers === 'function') {
-                createStairStringers(stair, dims, stairMeshGroup);
-            }
-            if (typeof createStairTreadsAndRisers === 'function') {
-                createStairTreadsAndRisers(stair, dims, stairMeshGroup, colorConfig);
-            }
-            if (stair.includeHandrails && typeof createStairHandrails === 'function') {
-                createStairHandrails(stair, dims, stairMeshGroup);
-            }
-
-            // Position and rotate the stair group
-            var worldPos = window.stair3DFunctions.getStairWorldPosition(stair, dims);
-            var rotation = window.stair3DFunctions.getStairRotation(stair.edge);
-
-            stairMeshGroup.position.set(worldPos.x, 0, worldPos.z);
-            stairMeshGroup.rotation.y = rotation;
-
-            stairGroup.add(stairMeshGroup);
-            stairMeshes[stair.id] = stairMeshGroup;
-        }
-    };
-
-    // Also update the global createStairs reference
-    if (typeof window.createStairs !== 'undefined') {
-        window.createStairs = window.stair3DFunctions.createStairs;
-    }
 
     // ========================================================================
     // PATCH 5: Backfill existing stairs in state that lack the new fields
