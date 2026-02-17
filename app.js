@@ -1800,18 +1800,13 @@ function executeBuildDeck() {
 
                 // Create stairs if enabled
         if (state.stairsEnabled && state.stairs && state.stairs.length > 0) {
-            // Ensure stair group is initialized first
-            if (typeof initStairGroup === 'function') {
-                initStairGroup();
-            } else if (window.stair3DFunctions && window.stair3DFunctions.initStairGroup) {
+            // Always route through window.stair3DFunctions so the L-shape patch is respected
+            if (window.stair3DFunctions) {
                 window.stair3DFunctions.initStairGroup();
-            }
-            
-            // Now create the stairs
-            if (typeof createStairs === 'function') {
-                createStairs();
-            } else if (window.stair3DFunctions && window.stair3DFunctions.createStairs) {
                 window.stair3DFunctions.createStairs();
+            } else {
+                initStairGroup();
+                createStairs();
             }
         }
 
@@ -2432,8 +2427,8 @@ function createStairs() {
     const colorConfig = CONFIG.colors.find(c => c.id === state.mainColor) || CONFIG.colors[0];
     
     for (const stair of state.stairs) {
-        // Force straight shape for now
-        const stairConfig = { ...stair, shape: 'straight' };
+        // Use the stair's actual shape (l-shaped patch handles dispatch)
+        const stairConfig = { ...stair };
         
         const dims = window.stairFunctions.calculateStairDimensions(stairConfig);
         if (!dims.isValid) continue;
@@ -2637,20 +2632,6 @@ function createStairHandrails(stairConfig, dims, parentGroup) {
     });
 }
 
-// Make functions globally accessible
-window.stair3DFunctions = {
-    initStairGroup,
-    disposeStairGroup,
-    createStairs,
-    createStraightStair: createStairs,
-    getStairWorldPosition,
-    getStairRotation,
-    stairMeshes: () => stairMeshes,
-    stairGroup: () => stairGroup
-};
-
-console.log('Straight Stair 3D Geometry loaded');
-
 // ===========================================
 // HIGHLIGHT/SELECTION VISUAL FEEDBACK
 // ===========================================
@@ -2698,6 +2679,22 @@ function showStairDragPreview(stairId, newPosition) {
 // ===========================================
 // EXPORTS / GLOBAL ACCESS
 // ===========================================
+
+// Make functions globally accessible (including highlight/drag preview)
+window.stair3DFunctions = {
+    initStairGroup,
+    disposeStairGroup,
+    createStairs,
+    createStraightStair: createStairs,
+    getStairWorldPosition,
+    getStairRotation,
+    highlightStair,
+    showStairDragPreview,
+    stairMeshes: () => stairMeshes,
+    stairGroup: () => stairGroup
+};
+
+console.log('Straight Stair 3D Geometry loaded');
 
 
 // ============================================================================
