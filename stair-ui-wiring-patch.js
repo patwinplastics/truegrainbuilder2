@@ -188,10 +188,10 @@
                 }
             }
 
-            // Update the selected stair in state
+            // Update the selected stair in state via the global export
             var stair = getSelectedStair();
             if (stair) {
-                updateStair(stair.id, { shape: modelShape });
+                window.stairFunctions.updateStair(stair.id, { shape: modelShape });
 
                 // Refresh info cards
                 var updated = getSelectedStair();
@@ -214,10 +214,10 @@
             var selectedCard = e.target.closest('.radio-card');
             if (selectedCard) selectedCard.classList.add('selected');
 
-            // Update stair
+            // Update stair via the global export
             var stair = getSelectedStair();
             if (stair) {
-                updateStair(stair.id, { turnDirection: e.target.value });
+                window.stairFunctions.updateStair(stair.id, { turnDirection: e.target.value });
 
                 // Refresh info card (turn direction affects L-shape geometry)
                 var updated = getSelectedStair();
@@ -239,7 +239,7 @@
 
             var stair = getSelectedStair();
             if (stair) {
-                updateStair(stair.id, { landingDepth: val });
+                window.stairFunctions.updateStair(stair.id, { landingDepth: val });
                 var updated = getSelectedStair();
                 updateLShapeInfoCard(updated);
                 updateStairInfoCard(updated);
@@ -255,7 +255,7 @@
 
             var stair = getSelectedStair();
             if (stair) {
-                updateStair(stair.id, { landingDepth: val });
+                window.stairFunctions.updateStair(stair.id, { landingDepth: val });
                 var updated = getSelectedStair();
                 updateLShapeInfoCard(updated);
                 updateStairInfoCard(updated);
@@ -276,7 +276,7 @@
 
             var stair = getSelectedStair();
             if (stair) {
-                updateStair(stair.id, { landingSplit: pct / 100 });
+                window.stairFunctions.updateStair(stair.id, { landingSplit: pct / 100 });
                 var updated = getSelectedStair();
                 updateLShapeInfoCard(updated);
                 updateStairInfoCard(updated);
@@ -292,7 +292,7 @@
 
             var stair = getSelectedStair();
             if (stair) {
-                updateStair(stair.id, { landingSplit: pct / 100 });
+                window.stairFunctions.updateStair(stair.id, { landingSplit: pct / 100 });
                 var updated = getSelectedStair();
                 updateLShapeInfoCard(updated);
                 updateStairInfoCard(updated);
