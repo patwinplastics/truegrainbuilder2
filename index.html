@@ -738,6 +738,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Main Application -->
     <script src="app.js"></script>
+    <!-- Killswitch: strip duplicate stairShape handler from app.js before patches re-attach correctly -->
+    <script src="stair-shape-handler-killswitch.js"></script>
     <!-- Stair Data Model Patch (Step 2: landingDepth, landingSplit, L-shape data) -->
     <script src="stair-data-model-patch.js"></script>
     <!-- L-Shaped Stair 3D Geometry Patch (must load AFTER data model patch so its
