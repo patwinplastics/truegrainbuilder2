@@ -13,7 +13,13 @@ export function preloadTextures() {
         if (textureCache[color.id]) return;
         loader.load(
             CONFIG.texturePath + color.file,
-            tex => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; textureCache[color.id] = tex; },
+            tex => {
+                tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                tex.generateMipmaps = false;
+                textureCache[color.id] = tex;
+            },
             undefined,
             () => console.warn(`Texture load failed: ${color.file}`)
         );
@@ -31,12 +37,12 @@ export function disposeAllCaches() {
 
 /**
  * Create (or return cached) board material.
- * Cache key uses color + orientation + board length ONLY.
- * Boards sharing the same visual properties reuse one material
- * and one texture clone instead of duplicating per board.
+ * Each board gets its texture stretched once across the face — no tiling.
+ * Grain runs along the board length by default; rotated 90° when
+ * the board runs along the deck width.
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
-    const rotation = boardRunsAlongWidth ? Math.PI : Math.PI / 2;
+    const rotation = boardRunsAlongWidth ? Math.PI / 2 : 0;
     const key = `board_${colorConfig.id}_${rotation.toFixed(2)}_${boardLengthFt}`;
     if (materialCache[key]) return materialCache[key];
 
@@ -48,8 +54,14 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 
     const applyTex = (src) => {
         const tex = src.clone();
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(boardLengthFt / 16, 0.5);
+        // Clamp to edge — no repeating, no tiling seams
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        // Stretch texture once across the entire board face
+        tex.repeat.set(1, 1);
+        tex.offset.set(0, 0);
         tex.center.set(0.5, 0.5);
         tex.rotation = rotation;
         tex.needsUpdate = true;
@@ -62,6 +74,10 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
         applyTex(textureCache[colorConfig.id]);
     } else {
         new THREE.TextureLoader().load(CONFIG.texturePath + colorConfig.file, src => {
+            src.wrapS = src.wrapT = THREE.ClampToEdgeWrapping;
+            src.minFilter = THREE.LinearFilter;
+            src.magFilter = THREE.LinearFilter;
+            src.generateMipmaps = false;
             textureCache[colorConfig.id] = src;
             applyTex(src);
         });
