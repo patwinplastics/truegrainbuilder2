@@ -22,10 +22,20 @@ export const getScene    = () => scene;
 export const getCamera   = () => camera;
 export const getRenderer = () => renderer;
 
+// ============================================================
+// initScene — deferred until container has real dimensions
+// (flex layout may not be computed at DOMContentLoaded time)
+// ============================================================
 export function initScene() {
     const container = document.getElementById('sceneContainer');
     const canvas    = document.getElementById('deckCanvas');
     if (!container || !canvas) return;
+
+    // Retry on next animation frame until container has a usable size
+    if (container.clientWidth < 10 || container.clientHeight < 10) {
+        requestAnimationFrame(initScene);
+        return;
+    }
 
     canvas.addEventListener('webglcontextlost', e => {
         e.preventDefault();
@@ -35,6 +45,7 @@ export function initScene() {
     canvas.addEventListener('webglcontextrestored', () => {
         contextLost = false;
         disposeAllCaches();
+        sceneInitialized = false;
         initScene();
     });
 
@@ -44,22 +55,29 @@ export function initScene() {
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.set(25, 20, 25);
 
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        preserveDrawingBuffer: true,
+        powerPreference: 'high-performance'
+    });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // OrbitControls — attached to canvas after it has real dimensions
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.minPolarAngle = 0;
-    controls.maxPolarAngle = Math.PI;
-    controls.minDistance   = 5;
-    controls.maxDistance   = 100;
+    controls.enableDamping  = true;
+    controls.dampingFactor  = 0.05;
+    controls.minPolarAngle  = 0;
+    controls.maxPolarAngle  = Math.PI * 0.9;
+    controls.minDistance    = 5;
+    controls.maxDistance    = 150;
+    controls.enablePan      = true;
+    controls.enableZoom     = true;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
     const sun = new THREE.DirectionalLight(0xffffff, 0.8);
     sun.position.set(20, 30, 20);
     sun.castShadow = true;
@@ -116,12 +134,13 @@ function executeBuildDeck() {
         createJoists(deckGroup, state);
         createDeckBoardsWithSegments(deckGroup, state, determinePattern(state), colorConfig);
         createWhiteFascia(deckGroup, state);
-        if (state.showRailings) createDetailedRailings(deckGroup, state);
-        if (state.stairsEnabled && state.stairs.length > 0) createAllStairs(deckGroup, state);
+        if (state.showRailings)                               createDetailedRailings(deckGroup, state);
+        if (state.stairsEnabled && state.stairs?.length > 0)  createAllStairs(deckGroup, state);
 
-        controls.target.set(0, state.deckHeight, 0);
+        controls.target.set(0, state.deckHeight / 2, 0);
         const m = Math.max(state.deckLength, state.deckWidth);
-        camera.position.set(m * 1.5, state.deckHeight + m * 1.05, m * 1.5);
+        camera.position.set(m * 1.4, state.deckHeight + m * 0.9, m * 1.4);
+        controls.update();
         updateBoardLegend();
     } catch (e) {
         console.error('Error building deck:', e);
@@ -134,16 +153,22 @@ function executeBuildDeck() {
 
 export function setCameraView(type) {
     if (!camera || !controls) return;
+    const m = Math.max(state.deckLength, state.deckWidth);
     if (type === 'top') {
-        camera.position.set(0, Math.max(state.deckLength, state.deckWidth) * 1.5, 0.01);
+        camera.position.set(0, m * 1.8, 0.01);
+        controls.target.set(0, 0, 0);
     } else {
-        const m = Math.max(state.deckLength, state.deckWidth);
-        camera.position.set(m * 1.5, state.deckHeight + m * 1.05, m * 1.5);
+        camera.position.set(m * 1.4, state.deckHeight + m * 0.9, m * 1.4);
+        controls.target.set(0, state.deckHeight / 2, 0);
     }
-    controls.target.set(0, state.deckHeight, 0);
+    controls.update();
 }
 
-export function zoomCamera(factor) { camera?.position.multiplyScalar(factor); }
+export function zoomCamera(factor) {
+    if (!camera || !controls) return;
+    camera.position.multiplyScalar(factor);
+    controls.update();
+}
 
 function updateBoardLegend() {
     const legend = document.getElementById('boardLegend');
@@ -152,7 +177,7 @@ function updateBoardLegend() {
     if (!items) return;
     items.innerHTML = '';
     [12, 16, 20].forEach(len => {
-        const count = state.boardLayout.boardsByLength[len];
+        const count = state.boardLayout.boardsByLength?.[len] || state.boardLayout.boardByLength?.[len];
         if (count > 0) {
             const el = document.createElement('div');
             el.className = 'board-legend__item';
