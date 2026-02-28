@@ -1,255 +1,278 @@
 /* ==============================================================
    TrueGrain Deck Builder 2 — Stair UI Styles
-   Covers: stair list, stair items, stair editor panel,
-           info cards, edge buttons, L-shape option block,
-           stair warnings, and add-controls layout.
+   All values use design tokens from main.css :root.
+   Primary: #1B2B4D (--color-primary), surfaces: warm white/cream.
    ============================================================== */
 
 /* ---- Stair panel wrapper ---- */
 .stair-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
 }
 
-/* ---- List container ---- */
+/* ---- Stair list ---- */
 .stair-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-md);
 }
 
 /* ---- Empty state ---- */
 .stair-list-empty {
-  padding: 14px 12px;
-  text-align: center;
-  color: #888;
-  font-size: 0.8125rem;
-  background: #f5f5f5;
-  border-radius: 8px;
-  border: 1.5px dashed #d0d0d0;
-  line-height: 1.5;
+    padding: var(--spacing-lg) var(--spacing-md);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1.5px dashed var(--color-border);
+    line-height: 1.5;
+}
+
+.stair-list-empty p {
+    margin: 0;
 }
 
 /* ---- Individual stair item ---- */
 .stair-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #ffffff;
-  border: 1.5px solid #e0e0e0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-  user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    user-select: none;
 }
 
 .stair-item:hover {
-  border-color: #b0b0b0;
-  background: #fafafa;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    border-color: var(--color-primary-light);
+    box-shadow: var(--shadow-sm);
 }
 
 .stair-item.selected {
-  border-color: var(--color-primary, #2563eb);
-  background: var(--color-primary-light, #eff6ff);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    border-color: var(--color-primary);
+    background: rgba(27, 43, 77, 0.04);
+    box-shadow: 0 0 0 3px rgba(27, 43, 77, 0.08);
 }
 
 .stair-item__info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
-  min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
 }
 
 .stair-item__edge {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text, #1a1a1a);
-  white-space: nowrap;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+.stair-item.selected .stair-item__edge {
+    color: var(--color-primary);
 }
 
 .stair-item__details {
-  font-size: 0.75rem;
-  color: var(--color-text-muted, #666666);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- Remove button inside item ---- */
+.stair-item .btn--danger.btn--small {
+    flex-shrink: 0;
+    opacity: 0.65;
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.stair-item:hover .btn--danger.btn--small {
+    opacity: 1;
 }
 
 /* ---- Add stairs controls ---- */
 .stair-add-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-  margin-bottom: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
 }
 
 .stair-add-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-muted, #666666);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
 }
 
 .stair-edge-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
 }
 
 .stair-edge-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 9px 10px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  font-family: inherit;
-  background: #ffffff;
-  border: 1.5px solid #d0d0d0;
-  border-radius: 8px;
-  cursor: pointer;
-  color: var(--color-text, #1a1a1a);
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-  line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    font-family: inherit;
+    background: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--color-text);
+    transition: all var(--transition-fast);
+    line-height: 1;
 }
 
 .stair-edge-btn:hover {
-  border-color: var(--color-primary, #2563eb);
-  background: var(--color-primary-light, #eff6ff);
-  color: var(--color-primary, #2563eb);
+    border-color: var(--color-primary-light);
+    background: rgba(27, 43, 77, 0.04);
+    color: var(--color-primary);
 }
 
 .stair-edge-btn:active {
-  background: var(--color-primary, #2563eb);
-  border-color: var(--color-primary, #2563eb);
-  color: #ffffff;
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-surface);
 }
 
 /* ---- Stair editor panel ---- */
 .stair-editor {
-  margin-top: 14px;
-  padding: 14px 14px 10px;
-  background: #f8f9fa;
-  border: 1.5px solid #e0e0e0;
-  border-radius: 10px;
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--color-surface);
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-md);
 }
 
 .stair-editor-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text, #1a1a1a);
-  margin: 0 0 12px 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e5e5e5;
-  letter-spacing: -0.01em;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0 0 var(--spacing-md) 0;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border-light);
+    letter-spacing: -0.01em;
 }
 
-/* ---- Info cards ---- */
+.stair-editor-title span {
+    color: var(--color-primary);
+    text-transform: capitalize;
+}
+
+/* ---- Stair info cards ---- */
 .stair-info-card {
-  background: #ffffff;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin: 8px 0;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-sm) 0;
 }
 
 .stair-info-header {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted, #888888);
-  margin-bottom: 7px;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-sm);
 }
 
 .stair-info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 3px 0;
-  font-size: 0.8125rem;
-  border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: var(--spacing-xs) 0;
+    font-size: var(--font-size-sm);
+    border-bottom: 1px solid var(--color-border-light);
 }
 
 .stair-info-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 .stair-info-label {
-  color: var(--color-text-muted, #666666);
+    color: var(--color-text-muted);
 }
 
 .stair-info-value {
-  font-weight: 600;
-  color: var(--color-text, #1a1a1a);
-  font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
 }
 
 /* ---- L-shape option block ---- */
 .l-shape-options {
-  margin-top: 10px;
-  padding: 12px;
-  background: #f0f7ff;
-  border: 1.5px solid #bfdbfe;
-  border-radius: 9px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
 .l-shape-options .form-group:last-child {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
 
 /* ---- Stair warning ---- */
 .stair-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 11px 13px;
-  background: #fff7ed;
-  border: 1.5px solid #fed7aa;
-  border-radius: 8px;
-  font-size: 0.8125rem;
-  color: #9a3412;
-  line-height: 1.4;
-  margin-bottom: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(255, 152, 0, 0.08);
+    border: 1px solid rgba(255, 152, 0, 0.35);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    color: #7a4a00;
+    line-height: 1.4;
+    margin-bottom: var(--spacing-md);
 }
 
 .stair-warning svg {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  color: #ea580c;
-  margin-top: 1px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    color: var(--color-warning);
+    margin-top: 1px;
 }
 
-/* ---- Highlight selected step in nav ---- */
-.stair-item.selected .stair-item__edge {
-  color: var(--color-primary, #2563eb);
+/* ---- Danger button (override/define for this component) ---- */
+.btn--danger {
+    background: #e53935;
+    color: #ffffff;
+    border: none;
 }
 
-/* ---- Remove button inline ---- */
-.stair-item .btn--danger.btn--small {
-  flex-shrink: 0;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  line-height: 1;
-  border-radius: 6px;
-  opacity: 0.7;
-  transition: opacity 0.15s ease;
+.btn--danger:hover {
+    background: #c62828;
 }
 
-.stair-item .btn--danger.btn--small:hover {
-  opacity: 1;
+/* ---- Mobile ---- */
+@media (max-width: 767px) {
+    .stair-edge-buttons {
+        grid-template-columns: 1fr 1fr;
+    }
 }
