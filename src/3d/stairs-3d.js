@@ -12,7 +12,8 @@ const ST = {
     in: ((CONFIG.stairs.stringerInset     ?? 1.5))  / 12
 };
 
-const EDGE_OFFSET = CONFIG.boards.thickness / 12;
+const BOARD_TH = CONFIG.boards.thickness / 12;
+const EDGE_OFFSET = BOARD_TH;
 
 const stringerMat = () => {
     if (!materialCache['_stringer']) materialCache['_stringer'] = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
@@ -29,29 +30,30 @@ const handrailMat = () => {
  * - Under 3ft: 2 stringers (sides only)
  * - 3ft to 6ft: 3 stringers (sides + 1 center)
  * - Over 6ft: 4 stringers (sides + 2 evenly spaced)
+ *
+ * Center stringers get a yOffset to sit below the tread surfaces.
+ * The offset is -(ST.w + BOARD_TH) which places the stringer top
+ * one full board thickness below where treads sit.
  */
 function getStringerPositions(stairWidthFt) {
     const minCenter = CONFIG.stairs.centerStringerMinWidth ?? 3;
     const minDouble = CONFIG.stairs.doubleCenterStringerMinWidth ?? 6;
     const sideL = -stairWidthFt / 2 + ST.in;
     const sideR =  stairWidthFt / 2 - ST.in;
-    const centerYOffset = -ST.w / 2;
+    const centerYOffset = -(ST.w + BOARD_TH);
 
     if (stairWidthFt < minCenter) {
-        // Narrow stairs: sides only
         return [
             { lat: sideL, yOffset: 0 },
             { lat: sideR, yOffset: 0 }
         ];
     } else if (stairWidthFt < minDouble) {
-        // Standard width: sides + 1 center
         return [
             { lat: sideL, yOffset: 0 },
             { lat: 0,     yOffset: centerYOffset },
             { lat: sideR, yOffset: 0 }
         ];
     } else {
-        // Wide stairs: sides + 2 evenly spaced centers
         const third = stairWidthFt / 3;
         const c1 = -stairWidthFt / 2 + third;
         const c2 = -stairWidthFt / 2 + third * 2;
