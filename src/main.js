@@ -1,6 +1,5 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Application Bootstrap
-// Single entry point. Wires every module together.
 // ============================================================
 import { CONFIG }                                     from './config.js';
 import { state, updateState, loadState,
@@ -16,16 +15,10 @@ import { initStairUI }                                from './ui/stair-ui.js';
 import { submitQuote }                                from './services/quote.js';
 import { generatePDF }                                from './services/pdf.js';
 
-// ---- Step 1: Inject calculators (breaks circular import) ----
 initCalculators(calculateOptimalBoardLayout, calculateAll);
-
-// ---- Step 2: Restore persisted state ----
 loadState();
-
-// ---- Step 3: Subscribe UI renderer to state ----
 subscribe(updateUI);
 
-// ---- Step 4: Boot on DOM ready ----
 document.addEventListener('DOMContentLoaded', () => {
     preloadTextures();
     initScene();
@@ -33,8 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initProgressNav();
     initStairUI();
     bindEventListeners();
-
-    // Sync wizard UI with restored state (e.g. currentStep from localStorage)
     goToStep(state.currentStep);
 });
 
@@ -65,6 +56,13 @@ function syncSlider(sliderId, inputId, key, min, max, parse = parseFloat) {
     });
 }
 
+// Syncs .selected class on .radio-card labels to match the checked radio input
+function syncRadioCards(name) {
+    document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+        r.closest('.radio-card')?.classList.toggle('selected', r.checked);
+    });
+}
+
 // ============================================================
 // Event Listeners
 // ============================================================
@@ -78,14 +76,26 @@ function bindEventListeners() {
     // ---- Joist spacing radios ----
     document.querySelectorAll('input[name="joistSpacing"]').forEach(r => {
         r.checked = +r.value === state.joistSpacing;
-        r.addEventListener('change', e => updateState({ joistSpacing: +e.target.value }));
     });
+    syncRadioCards('joistSpacing');
+    document.querySelectorAll('input[name="joistSpacing"]').forEach(r =>
+        r.addEventListener('change', e => {
+            updateState({ joistSpacing: +e.target.value });
+            syncRadioCards('joistSpacing');
+        })
+    );
 
     // ---- Board direction radios ----
     document.querySelectorAll('input[name="boardDirection"]').forEach(r => {
         r.checked = r.value === state.boardDirection;
-        r.addEventListener('change', e => updateState({ boardDirection: e.target.value }));
     });
+    syncRadioCards('boardDirection');
+    document.querySelectorAll('input[name="boardDirection"]').forEach(r =>
+        r.addEventListener('change', e => {
+            updateState({ boardDirection: e.target.value });
+            syncRadioCards('boardDirection');
+        })
+    );
 
     // ---- Pattern cards ----
     document.querySelectorAll('.pattern-option').forEach(btn =>
@@ -98,11 +108,11 @@ function bindEventListeners() {
     // ---- Same-color toggles ----
     wire('breakerSameColor', v => {
         updateState({ breakerSameColor: v });
-        document.getElementById('breakerColorSection')?.classList.toggle('hidden', v);
+        document.getElementById('breakerColorSwatches')?.closest('.form-group')?.classList.toggle('hidden', v);
     });
     wire('borderSameColor', v => {
         updateState({ borderSameColor: v });
-        document.getElementById('borderColorSection')?.classList.toggle('hidden', v);
+        document.getElementById('borderColorSwatches')?.closest('.form-group')?.classList.toggle('hidden', v);
     });
 
     // ---- Waste & price ----
@@ -156,7 +166,6 @@ function bindEventListeners() {
     );
 }
 
-// Checkbox helper
 function wire(id, handler) {
     const el = document.getElementById(id);
     if (!el) return;
