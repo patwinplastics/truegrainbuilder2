@@ -3,7 +3,7 @@
 // ============================================================
 import { CONFIG }                                             from '../config.js';
 import { state }                                              from '../state.js';
-import { preloadTextures, disposeAllCaches }                  from './materials.js';
+import { preloadTextures, disposeAllCaches, setMaxAnisotropy } from './materials.js';
 import { createRealisticGrass, createSupportPosts,
          createJoists, createWhiteFascia }                   from './structure.js';
 import { createDeckBoardsWithSegments }                       from './deck-boards.js';
@@ -24,14 +24,12 @@ export const getRenderer = () => renderer;
 
 // ============================================================
 // initScene — deferred until container has real dimensions
-// (flex layout may not be computed at DOMContentLoaded time)
 // ============================================================
 export function initScene() {
     const container = document.getElementById('sceneContainer');
     const canvas    = document.getElementById('deckCanvas');
     if (!container || !canvas) return;
 
-    // Retry on next animation frame until container has a usable size
     if (container.clientWidth < 10 || container.clientHeight < 10) {
         requestAnimationFrame(initScene);
         return;
@@ -66,7 +64,9 @@ export function initScene() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // OrbitControls — attached to canvas after it has real dimensions
+    // Enable max anisotropic filtering for wood textures
+    setMaxAnisotropy(renderer);
+
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping  = true;
     controls.dampingFactor  = 0.05;
@@ -121,12 +121,10 @@ const debouncedBuild = debounce(() => {
 
 export function buildDeck() { debouncedBuild(); }
 
-// Properly dispose all geometry in a group before clearing it
 function disposeGroupChildren(group) {
     group.traverse(child => {
         if (child.isMesh) {
             child.geometry?.dispose();
-            // Materials are cached/shared — do NOT dispose here
         }
     });
     while (group.children.length > 0) group.remove(group.children[0]);
@@ -137,7 +135,6 @@ function executeBuildDeck() {
     document.getElementById('buildingSpinner')?.classList.remove('hidden');
     isBuilding = true;
 
-    // Dispose old geometry to free GPU memory before rebuilding
     disposeGroupChildren(deckGroup);
 
     const colorConfig = CONFIG.colors.find(c => c.id === state.mainColor) || CONFIG.colors[0];
