@@ -46,19 +46,14 @@ export function disposeAllCaches() {
  * Source textures: grain runs VERTICALLY (along image Y axis).
  * BoxGeometry top face UV: U -> world X, V -> world Z.
  *
- * Without rotation: image-Y (grain) -> V -> world Z.
- * With PI/2 CCW rotation: image-Y (grain) -> U -> world X.
- *
  * Boards along X (boardRunsAlongWidth=false):
- *   Need grain along X. Rotate PI/2.
- *   After rotation, repeat.x tiles along world-Z (across board = narrow),
- *   repeat.y tiles along world-X (along board = long).
- *   So: repeat.set(1, boardLengthFt / 4)
+ *   Rotate PI/2 so image-Y (grain) aligns with world X.
+ *   After rotation, repeat.x -> along-board (X), repeat.y -> across-board (Z).
+ *   So: repeat.set(boardLengthFt / 4, 1)
  *
  * Boards along Z (boardRunsAlongWidth=true):
- *   Need grain along Z. No rotation.
- *   repeat.x tiles along world-X (across board = narrow),
- *   repeat.y tiles along world-Z (along board = long).
+ *   No rotation. Image-Y grain naturally aligns with Z via V.
+ *   repeat.x -> across-board (X), repeat.y -> along-board (Z).
  *   So: repeat.set(1, boardLengthFt / 4)
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
@@ -72,13 +67,21 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
         metalness: 0.0
     });
 
+    const alongBoard = boardLengthFt / 4;
+
     const applyTex = (src) => {
         const tex = src.clone();
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         tex.anisotropy = maxAniso;
-        // 1 tile across board width (seam at edge, hidden by gap)
-        // Multiple tiles along board length for proper grain density
-        tex.repeat.set(1, boardLengthFt / 4);
+
+        if (boardRunsAlongWidth) {
+            // No rotation: U=X(across), V=Z(along)
+            tex.repeat.set(1, alongBoard);
+        } else {
+            // PI/2 rotation: U=X(along), V=Z(across) after rotation swap
+            tex.repeat.set(alongBoard, 1);
+        }
+
         tex.center.set(0.5, 0.5);
         tex.rotation = rotation;
         tex.needsUpdate = true;
