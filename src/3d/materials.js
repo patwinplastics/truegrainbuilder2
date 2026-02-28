@@ -7,6 +7,8 @@ export const textureCache  = {};
 export const materialCache = {};
 export const geometryCache = {};
 
+let maxAniso = 1;
+
 export function preloadTextures() {
     const loader = new THREE.TextureLoader();
     CONFIG.colors.forEach(color => {
@@ -14,15 +16,19 @@ export function preloadTextures() {
         loader.load(
             CONFIG.texturePath + color.file,
             tex => {
-                tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-                tex.minFilter = THREE.LinearFilter;
-                tex.magFilter = THREE.LinearFilter;
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.anisotropy = maxAniso;
                 textureCache[color.id] = tex;
             },
             undefined,
             () => console.warn(`Texture load failed: ${color.file}`)
         );
     });
+}
+
+export function setMaxAnisotropy(renderer) {
+    maxAniso = renderer.capabilities.getMaxAnisotropy?.() || 1;
+    Object.values(textureCache).forEach(t => { t.anisotropy = maxAniso; t.needsUpdate = true; });
 }
 
 export function disposeAllCaches() {
@@ -37,13 +43,23 @@ export function disposeAllCaches() {
 /**
  * Create (or return cached) board material.
  *
- * Texture grain runs vertically in the source image.
+ * Source textures: grain runs VERTICALLY (along image Y axis).
  * BoxGeometry top face UV: U -> world X, V -> world Z.
  *
- * Boards along deck LENGTH (X-axis): rotate PI/2 so grain aligns with X.
- * Boards along deck WIDTH  (Z-axis): no rotation, grain already aligns with Z.
+ * Without rotation: image-Y (grain) -> V -> world Z.
+ * With PI/2 CCW rotation: image-Y (grain) -> U -> world X.
  *
- * Texture is stretched once across the full board (no tiling, no seams).
+ * Boards along X (boardRunsAlongWidth=false):
+ *   Need grain along X. Rotate PI/2.
+ *   After rotation, repeat.x tiles along world-Z (across board = narrow),
+ *   repeat.y tiles along world-X (along board = long).
+ *   So: repeat.set(1, boardLengthFt / 4)
+ *
+ * Boards along Z (boardRunsAlongWidth=true):
+ *   Need grain along Z. No rotation.
+ *   repeat.x tiles along world-X (across board = narrow),
+ *   repeat.y tiles along world-Z (along board = long).
+ *   So: repeat.set(1, boardLengthFt / 4)
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
     const rotation = boardRunsAlongWidth ? 0 : Math.PI / 2;
@@ -58,12 +74,11 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 
     const applyTex = (src) => {
         const tex = src.clone();
-        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        // Single stretch across the entire board face
-        tex.repeat.set(1, 1);
-        tex.offset.set(0, 0);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.anisotropy = maxAniso;
+        // 1 tile across board width (seam at edge, hidden by gap)
+        // Multiple tiles along board length for proper grain density
+        tex.repeat.set(1, boardLengthFt / 4);
         tex.center.set(0.5, 0.5);
         tex.rotation = rotation;
         tex.needsUpdate = true;
@@ -76,9 +91,8 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
         applyTex(textureCache[colorConfig.id]);
     } else {
         new THREE.TextureLoader().load(CONFIG.texturePath + colorConfig.file, src => {
-            src.wrapS = src.wrapT = THREE.ClampToEdgeWrapping;
-            src.minFilter = THREE.LinearFilter;
-            src.magFilter = THREE.LinearFilter;
+            src.wrapS = src.wrapT = THREE.RepeatWrapping;
+            src.anisotropy = maxAniso;
             textureCache[colorConfig.id] = src;
             applyTex(src);
         });
