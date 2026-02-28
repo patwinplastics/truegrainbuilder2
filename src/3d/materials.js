@@ -34,11 +34,20 @@ export function disposeAllCaches() {
 
 /**
  * Create (or return cached) board material.
- * Texture tiles along board length for realistic grain density.
- * Y repeat is 1.0 so tile boundaries fall at board edges (hidden by gaps).
+ *
+ * Texture grain runs vertically in the source image.
+ * BoxGeometry top face UV: U -> world X, V -> world Z.
+ *
+ * Boards along deck LENGTH (X-axis): boardRunsAlongWidth = false
+ *   Rotate texture PI/2 so image-vertical (grain) aligns with X.
+ *   After rotation: repeat.x controls across-board, repeat.y controls along-board.
+ *
+ * Boards along deck WIDTH (Z-axis): boardRunsAlongWidth = true
+ *   No rotation needed. Image-vertical (grain) naturally aligns with Z via V.
+ *   repeat.x controls along-board, repeat.y controls across-board.
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
-    const rotation = boardRunsAlongWidth ? Math.PI / 2 : 0;
+    const rotation = boardRunsAlongWidth ? 0 : Math.PI / 2;
     const key = `board_${colorConfig.id}_${rotation.toFixed(2)}_${boardLengthFt}`;
     if (materialCache[key]) return materialCache[key];
 
@@ -51,9 +60,17 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
     const applyTex = (src) => {
         const tex = src.clone();
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        // Tile along board length for grain density; 1 tile across width
-        // so the seam boundary falls exactly at the board edge (invisible)
-        tex.repeat.set(boardLengthFt / 4, 1);
+
+        // Grain tiles along board length; 1 tile across board width
+        // (seam at board edge, hidden by gap)
+        if (boardRunsAlongWidth) {
+            // No rotation: U=X(across), V=Z(along)
+            tex.repeat.set(1, boardLengthFt / 4);
+        } else {
+            // PI/2 rotation: after rotation, texture-X becomes along-board
+            tex.repeat.set(boardLengthFt / 4, 1);
+        }
+
         tex.center.set(0.5, 0.5);
         tex.rotation = rotation;
         tex.needsUpdate = true;
