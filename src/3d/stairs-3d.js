@@ -146,6 +146,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     buildFlightStringers({ parentGroup: g, stairWidthFt: sw, riseFt: rise1, runFt: ld.run1Feet, startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0, flightLabel: 'f1' });
 
     buildLanding({ parentGroup: g, colorConfig: cc, stairWidthFt: sw, landingDepthFt: ld.landingDepthFeet, landingY, centerZ: -ld.run1Feet - ld.landingDepthFeet / 2, turnSign: sign, run2Ft: ld.run2Feet });
+    buildLandingRiser({ parentGroup: g, colorConfig: cc, stairWidthFt: sw, risePerStep: rps, landingY, riserZ: -ld.run1Feet });
 
     const ox = 0, oz = -ld.run1Feet - ld.landingDepthFeet;
     buildFlightTreads({ stairConfig: sc, dims, colorConfig: cc, parentGroup: g, numTreads: ld.treadsAfterLanding, numRisers: dims.numRisers - ld.risersBeforeLanding, risePerStep: rps, treadDepthFt: tdf, stairWidthFt: sw, startY: landingY, dirZ: 0, dirX: sign, originX: ox, originZ: oz, flightLabel: 'f2' });
@@ -158,7 +159,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
 }
 
 // ============================================================
-// Flight builders (treads only, no risers)
+// Flight builders
 // ============================================================
 function buildFlightTreads(p) {
     const bwf = CONFIG.boards.width / 12, btf = CONFIG.boards.thickness / 12, gf = CONFIG.boards.gap / 12;
@@ -169,6 +170,7 @@ function buildFlightTreads(p) {
         const ro = (step + 1) * p.treadDepthFt;
         const cx = p.originX + p.dirX * (ro - p.treadDepthFt / 2);
         const cz = p.originZ + p.dirZ * (ro - p.treadDepthFt / 2);
+        // Tread boards
         for (let b = 0; b < p.dims.boardsPerTread; b++) {
             const bo = -p.treadDepthFt / 2 + b * (bwf + gf) + bwf / 2;
             const mat = createBoardMaterial(p.colorConfig, bl, false, `tr_${p.flightLabel}_${step}_${b}`);
@@ -178,6 +180,16 @@ function buildFlightTreads(p) {
             m.castShadow = m.receiveShadow = true;
             p.parentGroup.add(m);
         }
+        // Riser board at the FRONT face of this tread (the far edge from the deck)
+        const rx = p.originX + p.dirX * ro;
+        const rz = p.originZ + p.dirZ * ro;
+        const rg = runsX
+            ? new THREE.BoxGeometry(btf, p.risePerStep, p.stairWidthFt)
+            : new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf);
+        const rm = new THREE.Mesh(rg, createBoardMaterial(p.colorConfig, bl, false, `rs_${p.flightLabel}_${step}`));
+        rm.position.set(rx, sY - p.risePerStep / 2 + btf, rz);
+        rm.castShadow = true;
+        p.parentGroup.add(rm);
     }
 }
 
@@ -274,6 +286,14 @@ function buildLanding(p) {
     [[-pw/2,-pd/2],[pw/2,-pd/2],[pw/2,pd/2],[-pw/2,pd/2]].forEach(([fx, fz]) => {
         const post = new THREE.Mesh(pg, pm); post.position.set(cx + fx, p.landingY / 2, p.centerZ + fz); post.castShadow = true; p.parentGroup.add(post);
     });
+}
+
+function buildLandingRiser(p) {
+    const btf = CONFIG.boards.thickness / 12;
+    const bl  = selectOptimalBoardLength(p.stairWidthFt);
+    const m   = new THREE.Mesh(new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf), createBoardMaterial(p.colorConfig, bl, false, 'lr'));
+    m.position.set(0, p.landingY - p.risePerStep / 2 + btf, p.riserZ);
+    m.castShadow = true; p.parentGroup.add(m);
 }
 
 // ============================================================
