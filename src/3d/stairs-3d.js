@@ -129,20 +129,37 @@ function buildFlightStringers(p) {
     const angle = Math.atan2(p.riseFt, p.runFt);
     const runsX = Math.abs(p.dirX) > 0.5;
     const mat   = stringerMat();
-    const positions = [-p.stairWidthFt / 2 + ST.in, p.stairWidthFt / 2 - ST.in];
-    if (p.stairWidthFt > 6) positions.push(0);
-    positions.forEach(lat => {
+
+    // Side stringers only — positioned at each edge with an inset
+    const sidePositions = [-p.stairWidthFt / 2 + ST.in, p.stairWidthFt / 2 - ST.in];
+
+    // Center stringer only for wide stairs (>8ft), dropped so top face
+    // sits flush under the treads rather than poking through them
+    const centerYOffset = -ST.w / 2; // shift down by half stringer height
+    const allPositions  = p.stairWidthFt > 8
+        ? [...sidePositions, { lat: 0, yOffset: centerYOffset }]
+        : sidePositions.map(lat => ({ lat, yOffset: 0 }));
+
+    // Normalize to objects
+    const positions = allPositions.map(item =>
+        typeof item === 'number' ? { lat: item, yOffset: 0 } : item
+    );
+
+    positions.forEach(({ lat, yOffset }) => {
         const g = new THREE.BoxGeometry(ST.th, ST.w, sLen);
         const m = new THREE.Mesh(g, mat);
-        const cy = p.startY - p.riseFt / 2, rH = p.runFt / 2;
+        const cy = p.startY - p.riseFt / 2 + yOffset;
+        const rH = p.runFt / 2;
         if (runsX) {
             m.position.set(p.originX + p.dirX * rH, cy, p.originZ + lat);
-            m.rotation.z = p.dirX * angle; m.rotation.y = Math.PI / 2;
+            m.rotation.z = p.dirX * angle;
+            m.rotation.y = Math.PI / 2;
         } else {
             m.position.set(p.originX + lat, cy, p.originZ + p.dirZ * rH);
             m.rotation.x = p.dirZ * angle;
         }
-        m.castShadow = true; p.parentGroup.add(m);
+        m.castShadow = true;
+        p.parentGroup.add(m);
     });
 }
 
@@ -220,12 +237,12 @@ function getStairWorldPosition(stair, st) {
     }
 }
 
-// Flight builder descends in -Z (dirZ:-1) before rotation is applied.
-// Rotation maps that -Z descent direction to point AWAY from the deck:
-//   front (z=+half): needs PI    so -Z becomes +Z (outward)
-//   back  (z=-half): needs 0     so -Z stays -Z   (outward)
-//   left  (x=-half): needs -PI/2 so -Z becomes -X (outward)
-//   right (x=+half): needs +PI/2 so -Z becomes +X (outward)
+// Flight builder descends in -Z before rotation.
+// Rotation maps -Z outward from the deck edge:
+//   front (z=+half): PI    => -Z becomes +Z (outward)
+//   back  (z=-half): 0     => -Z stays -Z   (outward)
+//   left  (x=-half): -PI/2 => -Z becomes -X (outward)
+//   right (x=+half): +PI/2 => -Z becomes +X (outward)
 function getStairRotation(edge) {
     return {
         front:  Math.PI,
