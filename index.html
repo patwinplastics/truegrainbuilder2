@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="main.css">
+    <link rel="stylesheet" href="stair-styles.css">
 </head>
 <body>
     <div class="deck-designer">
@@ -112,7 +113,6 @@
 
                         <div class="form-group">
                             <label class="form-label">Board Direction</label>
-                            <!-- Radio cards (main.js wires input[name="boardDirection"]) -->
                             <div class="radio-cards radio-cards--inline">
                                 <label class="radio-card radio-card--small selected">
                                     <input type="radio" name="boardDirection" value="length" checked>
@@ -148,7 +148,6 @@
 
                         <div class="form-group">
                             <div class="pattern-cards">
-                                <!-- pattern-option class = querySelectorAll target in main.js + updates.js -->
                                 <div class="pattern-card pattern-option selected" data-pattern="straight">
                                     <div class="pattern-card__preview">
                                         <svg viewBox="0 0 100 60">
@@ -196,7 +195,6 @@
                             </div>
                         </div>
 
-                        <!-- Border width (id matches updates.js toggleHidden call) -->
                         <div class="form-group hidden" id="borderWidthSection">
                             <label class="form-label">Border Width (boards)</label>
                             <div class="slider-input">
@@ -205,7 +203,6 @@
                             </div>
                         </div>
 
-                        <!-- Breaker color section (id="breakerColorSection" = target in updates.js + main.js) -->
                         <div class="form-group hidden" id="breakerColorSection">
                             <div class="checkbox-toggle">
                                 <input type="checkbox" id="breakerSameColor" checked>
@@ -214,7 +211,6 @@
                             <div class="color-swatches" id="breakerColorSwatches" style="margin-top:8px"></div>
                         </div>
 
-                        <!-- Border color section (id="borderColorSection" = target in updates.js + main.js) -->
                         <div class="form-group hidden" id="borderColorSection">
                             <div class="checkbox-toggle">
                                 <input type="checkbox" id="borderSameColor" checked>
@@ -247,10 +243,8 @@
                             <p class="form-hint">Railings are for visualization only and not included in the estimate.</p>
                         </div>
 
-                        <!-- Stairs -->
                         <div class="form-group">
                             <div class="checkbox-toggle">
-                                <!-- id="stairsEnabled" matches main.js wire() call -->
                                 <input type="checkbox" id="stairsEnabled">
                                 <label for="stairsEnabled">Add stairs to deck</label>
                             </div>
@@ -274,9 +268,18 @@
                                 </div>
                             </div>
 
-                            <!-- Stair Editor -->
                             <div class="stair-editor hidden" id="stairEditor">
                                 <h4 class="stair-editor-title">Edit Stair: <span id="stairEditorEdge"></span></h4>
+
+                                <div class="form-group">
+                                    <label class="form-label">Stair Width (feet)</label>
+                                    <div class="slider-input">
+                                        <input type="range" id="stairWidthSlider" class="slider" min="3" max="8" value="4" step="0.5">
+                                        <input type="number" id="stairWidthInput" class="number-input" min="3" max="8" value="4" step="0.5">
+                                        <span class="unit">ft</span>
+                                    </div>
+                                    <p class="form-hint">Minimum 36" for code compliance.</p>
+                                </div>
 
                                 <div class="form-group">
                                     <label class="form-label">Boards Per Tread</label>
@@ -293,7 +296,7 @@
                                     </div>
                                 </div>
 
-                                <div class="stair-info-card">
+                                <div class="stair-info-card" id="treadDepthCard">
                                     <div class="stair-info-row">
                                         <span class="stair-info-label">Tread Depth:</span>
                                         <span class="stair-info-value" id="treadDepthDisplay">11"</span>
@@ -346,6 +349,7 @@
                                     </div>
 
                                     <div class="stair-info-card" id="lShapeInfoCard">
+                                        <div class="stair-info-header">L-Shape Dimensions</div>
                                         <div class="stair-info-row"><span class="stair-info-label">Lower Run Steps:</span><span class="stair-info-value" id="lShapeLowerSteps">2</span></div>
                                         <div class="stair-info-row"><span class="stair-info-label">Upper Run Steps:</span><span class="stair-info-value" id="lShapeUpperSteps">2</span></div>
                                         <div class="stair-info-row"><span class="stair-info-label">Landing Height:</span><span class="stair-info-value" id="lShapeLandingHeight">1 ft</span></div>
@@ -362,12 +366,13 @@
                                 </div>
 
                                 <div class="stair-info-card" id="stairInfoCard">
-                                    <div class="stair-info-row"><span class="stair-info-label">Steps:</span><span class="stair-info-value" id="stairStepCount">4</span></div>
+                                    <div class="stair-info-header">Calculated Dimensions</div>
+                                    <div class="stair-info-row"><span class="stair-info-label">Number of Steps:</span><span class="stair-info-value" id="stairStepCount">4</span></div>
                                     <div class="stair-info-row"><span class="stair-info-label">Total Run:</span><span class="stair-info-value" id="stairTotalRun">3.5 ft</span></div>
-                                    <div class="stair-info-row"><span class="stair-info-label">Rise/Step:</span><span class="stair-info-value" id="stairRisePerStep">7.5"</span></div>
+                                    <div class="stair-info-row"><span class="stair-info-label">Rise per Step:</span><span class="stair-info-value" id="stairRisePerStep">7.5"</span></div>
                                 </div>
 
-                                <button type="button" class="btn btn--danger btn--small" id="deleteStairBtn" style="width:100%;margin-top:var(--spacing-md)">Remove This Stair</button>
+                                <button type="button" class="btn btn--danger btn--small" id="deleteStairBtn" style="width:100%;margin-top:12px">Remove This Stair</button>
                             </div>
                         </div>
                     </section>
@@ -390,8 +395,8 @@
                         <div class="form-group">
                             <label class="form-label">Price Per Linear Foot</label>
                             <div class="slider-input">
-                                <input type="range" id="priceSlider" class="slider" min="2" max="10" value="4" step="0.25">
-                                <input type="number" id="priceInput" class="number-input" min="2" max="10" value="4" step="0.25">
+                                <input type="range" id="priceSlider" class="slider" min="2" max="10" value="6" step="0.25">
+                                <input type="number" id="priceInput" class="number-input" min="2" max="10" value="6" step="0.25">
                                 <span class="unit">$/LF</span>
                             </div>
                         </div>
@@ -450,16 +455,12 @@
                                     <input type="text" id="contactZip" class="text-input" placeholder="12345">
                                 </div>
                             </div>
-                            <div class="validation-error hidden"></div>
                         </div>
 
                         <div class="export-actions">
-                            <!-- id="submitQuoteBtn" matches main.js + quote.js -->
                             <button class="btn btn--success btn--large" id="submitQuoteBtn">
-                                <span class="btn-label">Submit to Sales Team</span>
-                                <span class="btn-spinner hidden">Sending...</span>
+                                Submit to Sales Team
                             </button>
-                            <!-- data-action="generate-pdf" matches main.js querySelectorAll -->
                             <button class="btn btn--secondary btn--large" data-action="generate-pdf">
                                 Download PDF
                             </button>
@@ -470,7 +471,6 @@
 
                 <!-- Wizard Navigation -->
                 <div class="wizard-nav">
-                    <!-- data-prev-step + data-next-step match wizard.js initProgressNav() -->
                     <button class="btn btn--secondary" id="prevBtn" data-prev-step disabled>Back</button>
                     <button class="btn btn--primary"   id="nextBtn" data-next-step>Next</button>
                 </div>
@@ -479,7 +479,6 @@
             <!-- Visualization Panel -->
             <section class="visualization-panel">
                 <div class="view-controls">
-                    <!-- id="view3D" / id="viewTop" match main.js camera control wiring -->
                     <button class="view-btn selected" id="view3D" data-view="3d">3D View</button>
                     <button class="view-btn" id="viewTop" data-view="top">Top Down</button>
                 </div>
@@ -497,7 +496,6 @@
                 </div>
 
                 <div class="scene-controls">
-                    <!-- id="zoomIn" / id="zoomOut" match main.js camera control wiring -->
                     <button class="scene-control-btn" id="zoomIn" aria-label="Zoom In">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"></circle>
@@ -534,7 +532,7 @@
         </div>
     </div>
 
-    <!-- CDN dependencies (must load before ES module so THREE is on window) -->
+    <!-- CDN dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
