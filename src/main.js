@@ -33,7 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initProgressNav();
     initStairUI();
     bindEventListeners();
-    updateState({});  // triggers first full render
+
+    // Sync wizard UI with restored state (e.g. currentStep from localStorage)
+    goToStep(state.currentStep);
 });
 
 // ============================================================

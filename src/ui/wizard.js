@@ -7,14 +7,34 @@ export function goToStep(step) {
     if (step < 1 || step > state.totalSteps) return;
     if (step > state.currentStep && !validateStep(state.currentStep)) return;
     updateState({ currentStep: step });
-    document.querySelectorAll('.wizard-step').forEach(el =>
-        el.classList.toggle('active', +el.dataset.step === step)
-    );
+
+    // Show/hide wizard step content sections
+    document.querySelectorAll('.wizard-step').forEach(el => {
+        const isTarget = +el.dataset.step === step;
+        el.classList.toggle('active', isTarget);
+        el.classList.toggle('hidden', !isTarget);
+    });
+
+    // Update progress indicator circles
     document.querySelectorAll('.progress-step').forEach(el => {
         const s = +el.dataset.step;
         el.classList.toggle('active', s === step);
         el.classList.toggle('completed', s < step);
     });
+
+    // Update Back/Next button states
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    if (prevBtn) prevBtn.disabled = step <= 1;
+    if (nextBtn) {
+        nextBtn.disabled = step >= state.totalSteps;
+        nextBtn.textContent = step >= state.totalSteps ? 'Done' : 'Next';
+    }
+
+    // Hide validation errors when switching steps
+    const errEl = document.querySelector('.validation-error');
+    if (errEl) errEl.classList.add('hidden');
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
