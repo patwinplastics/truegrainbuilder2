@@ -1,22 +1,17 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Stair 3D Geometry
-// Absorbs stair-3d-lshape-patch.js + straight stair logic.
-// L-shape rendering with landing platform, both flights, handrails.
 // ============================================================
 import { CONFIG }              from '../config.js';
 import { state }               from '../state.js';
 import { createBoardMaterial, materialCache } from './materials.js';
 import { selectOptimalBoardLength } from '../calc/optimizer.js';
 
-// Fallback stringer dimensions (inches -> feet)
 const ST = {
     th: ((CONFIG.stairs.stringerThickness ?? 1.5)) / 12,
     w:  ((CONFIG.stairs.stringerWidth     ?? 9.25)) / 12,
     in: ((CONFIG.stairs.stringerInset     ?? 1.5))  / 12
 };
 
-// Cached structural materials — stored in shared materialCache
-// so disposeAllCaches() cleans them up automatically
 const stringerMat = () => {
     if (!materialCache['_stringer']) materialCache['_stringer'] = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
     return materialCache['_stringer'];
@@ -74,7 +69,7 @@ function buildStraightStair(sc, dims, g, cc, st) {
 }
 
 // ============================================================
-// L-shaped stairs (ported from stair-3d-lshape-patch.js)
+// L-shaped stairs
 // ============================================================
 function buildLShapedStair(sc, dims, g, cc, st) {
     const ld = dims.lShapedData;
@@ -83,15 +78,12 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     const rise1 = ld.risersBeforeLanding * rps, rise2 = (dims.numRisers - ld.risersBeforeLanding) * rps;
     const landingY = st.deckHeight - rise1;
 
-    // Flight 1
     buildFlightTreads({ stairConfig: sc, dims, colorConfig: cc, parentGroup: g, numTreads: ld.treadsBeforeLanding, numRisers: ld.risersBeforeLanding, risePerStep: rps, treadDepthFt: tdf, stairWidthFt: sw, startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0, flightLabel: 'f1' });
     buildFlightStringers({ parentGroup: g, stairWidthFt: sw, riseFt: rise1, runFt: ld.run1Feet, startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0, flightLabel: 'f1' });
 
-    // Landing
     buildLanding({ parentGroup: g, colorConfig: cc, stairWidthFt: sw, landingDepthFt: ld.landingDepthFeet, landingY, centerZ: -ld.run1Feet - ld.landingDepthFeet / 2, turnSign: sign, run2Ft: ld.run2Feet });
     buildLandingRiser({ parentGroup: g, colorConfig: cc, stairWidthFt: sw, risePerStep: rps, landingY, riserZ: -ld.run1Feet });
 
-    // Flight 2
     const ox = 0, oz = -ld.run1Feet - ld.landingDepthFeet;
     buildFlightTreads({ stairConfig: sc, dims, colorConfig: cc, parentGroup: g, numTreads: ld.treadsAfterLanding, numRisers: dims.numRisers - ld.risersBeforeLanding, risePerStep: rps, treadDepthFt: tdf, stairWidthFt: sw, startY: landingY, dirZ: 0, dirX: sign, originX: ox, originZ: oz, flightLabel: 'f2' });
     buildFlightStringers({ parentGroup: g, stairWidthFt: sw, riseFt: rise2, runFt: ld.run2Feet, startY: landingY, dirZ: 0, dirX: sign, originX: ox, originZ: oz, flightLabel: 'f2' });
@@ -103,7 +95,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
 }
 
 // ============================================================
-// Flight builders (generic direction via dirX/dirZ)
+// Flight builders
 // ============================================================
 function buildFlightTreads(p) {
     const bwf = CONFIG.boards.width / 12, btf = CONFIG.boards.thickness / 12, gf = CONFIG.boards.gap / 12;
@@ -123,7 +115,6 @@ function buildFlightTreads(p) {
             m.castShadow = m.receiveShadow = true;
             p.parentGroup.add(m);
         }
-        // Riser
         const rx = p.originX + p.dirX * (ro - p.treadDepthFt);
         const rz = p.originZ + p.dirZ * (ro - p.treadDepthFt);
         const rg = runsX ? new THREE.BoxGeometry(btf, p.risePerStep, p.stairWidthFt) : new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf);
@@ -140,7 +131,7 @@ function buildFlightStringers(p) {
     const mat   = stringerMat();
     const positions = [-p.stairWidthFt / 2 + ST.in, p.stairWidthFt / 2 - ST.in];
     if (p.stairWidthFt > 6) positions.push(0);
-    positions.forEach((lat, i) => {
+    positions.forEach(lat => {
         const g = new THREE.BoxGeometry(ST.th, ST.w, sLen);
         const m = new THREE.Mesh(g, mat);
         const cy = p.startY - p.riseFt / 2, rH = p.runFt / 2;
@@ -228,12 +219,24 @@ function getStairWorldPosition(stair, st) {
         default:      return { x: 0, z: st.deckWidth / 2 };
     }
 }
+
+// Flight builder descends in -Z (dirZ:-1) before rotation is applied.
+// Rotation maps that -Z descent direction to point AWAY from the deck:
+//   front (z=+half): needs PI    so -Z becomes +Z (outward)
+//   back  (z=-half): needs 0     so -Z stays -Z   (outward)
+//   left  (x=-half): needs -PI/2 so -Z becomes -X (outward)
+//   right (x=+half): needs +PI/2 so -Z becomes +X (outward)
 function getStairRotation(edge) {
-    return { front: 0, back: Math.PI, left: Math.PI / 2, right: -Math.PI / 2 }[edge] ?? 0;
+    return {
+        front:  Math.PI,
+        back:   0,
+        left:  -Math.PI / 2,
+        right:  Math.PI / 2
+    }[edge] ?? Math.PI;
 }
 
 // ============================================================
-// L-shape dimension calculator (ported from stair-data-model-patch)
+// L-shape dimension calculator
 // ============================================================
 function calcLShape(nr, nt, ar, td, dir, ldFt, ls) {
     const ldf   = typeof ldFt === 'number' ? ldFt : CONFIG.stairs.landingDepth;
