@@ -25,7 +25,7 @@ export function goToStep(step) {
     const nextBtn = document.getElementById('nextBtn');
     if (prevBtn) prevBtn.disabled = step <= 1;
     if (nextBtn) {
-        nextBtn.disabled   = step >= state.totalSteps;
+        nextBtn.disabled    = step >= state.totalSteps;
         nextBtn.textContent = step >= state.totalSteps ? 'Done' : 'Next';
     }
 
@@ -54,10 +54,8 @@ export function initProgressNav() {
     document.querySelectorAll('.progress-step').forEach(el => {
         el.addEventListener('click', () => {
             const t = +el.dataset.step;
-            // Allow clicking any step that has been reached (completed or current)
-            // as well as going forward one step at a time
-            const maxReached = state.currentStep;
-            if (t <= maxReached) goToStep(t);
+            // Allow: any already-visited step, current step, or one step ahead
+            if (t <= state.currentStep + 1) goToStep(t);
         });
     });
     document.querySelectorAll('[data-next-step]').forEach(btn =>
