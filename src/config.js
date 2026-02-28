@@ -32,7 +32,16 @@ export const CONFIG = {
         landingDepth: 3,
         boardsPerTread: { min: 1, max: 3, default: 2 },
         riserHeight: { target: 7, min: 4, max: 7.75 },
-        treadDepth: { min: 10 }
+        treadDepth: { min: 10 },
+        stringerThickness: 1.5,
+        stringerWidth: 9.25,
+        stringerInset: 1.5,
+        // Center stringer thresholds (in feet)
+        // Under centerStringerMinWidth: 2 stringers (sides only)
+        // centerStringerMinWidth to doubleCenter: 3 stringers (sides + 1 center)
+        // Above doubleCenter: 4 stringers (sides + 2 centers)
+        centerStringerMinWidth: 3,
+        doubleCenterStringerMinWidth: 6
     },
     pricing: {
         materialPerLF: { min: 5.00, max: 7.00, default: 6.00 },

@@ -12,7 +12,7 @@ const ST = {
     in: ((CONFIG.stairs.stringerInset     ?? 1.5))  / 12
 };
 
-const EDGE_OFFSET = CONFIG.boards.thickness / 12; // push stair group just outside fascia
+const EDGE_OFFSET = CONFIG.boards.thickness / 12;
 
 const stringerMat = () => {
     if (!materialCache['_stringer']) materialCache['_stringer'] = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
@@ -22,6 +22,47 @@ const handrailMat = () => {
     if (!materialCache['_handrail']) materialCache['_handrail'] = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.6 });
     return materialCache['_handrail'];
 };
+
+/**
+ * Calculate stringer lateral positions based on stair width.
+ * Per building code:
+ * - Under 3ft: 2 stringers (sides only)
+ * - 3ft to 6ft: 3 stringers (sides + 1 center)
+ * - Over 6ft: 4 stringers (sides + 2 evenly spaced)
+ */
+function getStringerPositions(stairWidthFt) {
+    const minCenter = CONFIG.stairs.centerStringerMinWidth ?? 3;
+    const minDouble = CONFIG.stairs.doubleCenterStringerMinWidth ?? 6;
+    const sideL = -stairWidthFt / 2 + ST.in;
+    const sideR =  stairWidthFt / 2 - ST.in;
+    const centerYOffset = -ST.w / 2;
+
+    if (stairWidthFt < minCenter) {
+        // Narrow stairs: sides only
+        return [
+            { lat: sideL, yOffset: 0 },
+            { lat: sideR, yOffset: 0 }
+        ];
+    } else if (stairWidthFt < minDouble) {
+        // Standard width: sides + 1 center
+        return [
+            { lat: sideL, yOffset: 0 },
+            { lat: 0,     yOffset: centerYOffset },
+            { lat: sideR, yOffset: 0 }
+        ];
+    } else {
+        // Wide stairs: sides + 2 evenly spaced centers
+        const third = stairWidthFt / 3;
+        const c1 = -stairWidthFt / 2 + third;
+        const c2 = -stairWidthFt / 2 + third * 2;
+        return [
+            { lat: sideL, yOffset: 0 },
+            { lat: c1,    yOffset: centerYOffset },
+            { lat: c2,    yOffset: centerYOffset },
+            { lat: sideR, yOffset: 0 }
+        ];
+    }
+}
 
 // ============================================================
 // Public API
@@ -42,9 +83,6 @@ export function createAllStairs(deckGroup, st) {
     });
 }
 
-// Position and orient the stair group so it descends outward from the deck edge.
-// Instead of rotating a -Z flight, we set dirZ/dirX per edge in buildStraightStair
-// and place the group at the correct edge with a small outward offset.
 function positionStairGroup(g, stair, st) {
     const p = stair.position || 0.5;
     const edge = stair.edge || 'front';
@@ -54,22 +92,22 @@ function positionStairGroup(g, stair, st) {
         case 'front':
             x = (p - 0.5) * st.deckLength;
             z = st.deckWidth / 2 + EDGE_OFFSET;
-            rotY = Math.PI; // -Z -> +Z (outward from front)
+            rotY = Math.PI;
             break;
         case 'back':
             x = (p - 0.5) * st.deckLength;
             z = -(st.deckWidth / 2 + EDGE_OFFSET);
-            rotY = 0; // -Z stays -Z (outward from back)
+            rotY = 0;
             break;
         case 'left':
             x = -(st.deckLength / 2 + EDGE_OFFSET);
             z = (p - 0.5) * st.deckWidth;
-            rotY = Math.PI / 2; // -Z -> -X (outward from left)
+            rotY = Math.PI / 2;
             break;
         case 'right':
             x = st.deckLength / 2 + EDGE_OFFSET;
             z = (p - 0.5) * st.deckWidth;
-            rotY = -Math.PI / 2; // -Z -> +X (outward from right)
+            rotY = -Math.PI / 2;
             break;
     }
 
@@ -165,14 +203,7 @@ function buildFlightStringers(p) {
     const runsX = Math.abs(p.dirX) > 0.5;
     const mat   = stringerMat();
 
-    const sidePositions = [-p.stairWidthFt / 2 + ST.in, p.stairWidthFt / 2 - ST.in];
-    const centerYOffset = -ST.w / 2;
-    const allPositions  = p.stairWidthFt > 8
-        ? [...sidePositions, { lat: 0, yOffset: centerYOffset }]
-        : sidePositions.map(lat => ({ lat, yOffset: 0 }));
-    const positions = allPositions.map(item =>
-        typeof item === 'number' ? { lat: item, yOffset: 0 } : item
-    );
+    const positions = getStringerPositions(p.stairWidthFt);
 
     positions.forEach(({ lat, yOffset }) => {
         const g = new THREE.BoxGeometry(ST.th, ST.w, sLen);
@@ -209,10 +240,8 @@ function buildFlightHandrails(p) {
             p.parentGroup.add(pm);
         };
         const endY = p.startY - p.riseFt;
-        // Top post (at deck edge)
         if (runsX) mkPost(p.originX, p.startY + pH / 2, lz);
         else       mkPost(lx, p.startY + pH / 2, p.originZ);
-        // Bottom post (at ground end)
         if (runsX) mkPost(p.originX + p.dirX * p.runFt, endY + pH / 2, lz);
         else       mkPost(lx, endY + pH / 2, p.originZ + p.dirZ * p.runFt);
 
