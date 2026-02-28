@@ -14,7 +14,9 @@ export function preloadTextures() {
         loader.load(
             CONFIG.texturePath + color.file,
             tex => {
-                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
                 textureCache[color.id] = tex;
             },
             undefined,
@@ -38,13 +40,10 @@ export function disposeAllCaches() {
  * Texture grain runs vertically in the source image.
  * BoxGeometry top face UV: U -> world X, V -> world Z.
  *
- * Boards along deck LENGTH (X-axis): boardRunsAlongWidth = false
- *   Rotate texture PI/2 so image-vertical (grain) aligns with X.
- *   After rotation: repeat.x controls across-board, repeat.y controls along-board.
+ * Boards along deck LENGTH (X-axis): rotate PI/2 so grain aligns with X.
+ * Boards along deck WIDTH  (Z-axis): no rotation, grain already aligns with Z.
  *
- * Boards along deck WIDTH (Z-axis): boardRunsAlongWidth = true
- *   No rotation needed. Image-vertical (grain) naturally aligns with Z via V.
- *   repeat.x controls along-board, repeat.y controls across-board.
+ * Texture is stretched once across the full board (no tiling, no seams).
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
     const rotation = boardRunsAlongWidth ? 0 : Math.PI / 2;
@@ -59,18 +58,12 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 
     const applyTex = (src) => {
         const tex = src.clone();
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-
-        // Grain tiles along board length; 1 tile across board width
-        // (seam at board edge, hidden by gap)
-        if (boardRunsAlongWidth) {
-            // No rotation: U=X(across), V=Z(along)
-            tex.repeat.set(1, boardLengthFt / 4);
-        } else {
-            // PI/2 rotation: after rotation, texture-X becomes along-board
-            tex.repeat.set(boardLengthFt / 4, 1);
-        }
-
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        // Single stretch across the entire board face
+        tex.repeat.set(1, 1);
+        tex.offset.set(0, 0);
         tex.center.set(0.5, 0.5);
         tex.rotation = rotation;
         tex.needsUpdate = true;
@@ -83,7 +76,9 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
         applyTex(textureCache[colorConfig.id]);
     } else {
         new THREE.TextureLoader().load(CONFIG.texturePath + colorConfig.file, src => {
-            src.wrapS = src.wrapT = THREE.RepeatWrapping;
+            src.wrapS = src.wrapT = THREE.ClampToEdgeWrapping;
+            src.minFilter = THREE.LinearFilter;
+            src.magFilter = THREE.LinearFilter;
             textureCache[colorConfig.id] = src;
             applyTex(src);
         });
