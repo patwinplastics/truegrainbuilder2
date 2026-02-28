@@ -9,6 +9,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="main.css">
     <link rel="stylesheet" href="stair-styles.css">
+    <style>
+        /* Wizard step visibility controlled by active class only */
+        .wizard-step          { display: none; }
+        .wizard-step.active   { display: block; }
+    </style>
 </head>
 <body>
     <div class="deck-designer">
@@ -100,14 +105,14 @@
                         <div class="info-card">
                             <span class="info-card__icon">&#x1F4D0;</span>
                             <div class="info-card__content">
-                                <span class="info-card__label">Total Area</span>
-                                <span class="info-card__value" id="totalArea">192 sq ft</span>
+                                <span class="info-card__label">TOTAL AREA</span>
+                                <span class="info-card__value" id="totalArea">192.0</span>
                             </div>
                         </div>
                     </section>
 
                     <!-- Step 2: Structure -->
-                    <section class="wizard-step hidden" data-step="2">
+                    <section class="wizard-step" data-step="2">
                         <h2 class="step__title">Structure Options</h2>
                         <p class="step__desc">Configure how your boards will be installed.</p>
 
@@ -142,7 +147,7 @@
                     </section>
 
                     <!-- Step 3: Pattern -->
-                    <section class="wizard-step hidden" data-step="3">
+                    <section class="wizard-step" data-step="3">
                         <h2 class="step__title">Board Pattern</h2>
                         <p class="step__desc">Choose a pattern for your deck boards.</p>
 
@@ -221,7 +226,7 @@
                     </section>
 
                     <!-- Step 4: Color -->
-                    <section class="wizard-step hidden" data-step="4">
+                    <section class="wizard-step" data-step="4">
                         <h2 class="step__title">Select Color</h2>
                         <p class="step__desc">Choose from our premium TrueGrain colors.</p>
                         <div class="form-group">
@@ -231,7 +236,7 @@
                     </section>
 
                     <!-- Step 5: Options -->
-                    <section class="wizard-step hidden" data-step="5">
+                    <section class="wizard-step" data-step="5">
                         <h2 class="step__title">Additional Options</h2>
                         <p class="step__desc">Customize your deck with additional features.</p>
 
@@ -378,7 +383,7 @@
                     </section>
 
                     <!-- Step 6: Estimate -->
-                    <section class="wizard-step hidden" data-step="6">
+                    <section class="wizard-step" data-step="6">
                         <h2 class="step__title">Material Estimate</h2>
                         <p class="step__desc">Review your estimated materials and costs.</p>
 
@@ -420,7 +425,7 @@
                     </section>
 
                     <!-- Step 7: Review -->
-                    <section class="wizard-step hidden" data-step="7">
+                    <section class="wizard-step" data-step="7">
                         <h2 class="step__title">Review &amp; Export</h2>
                         <p class="step__desc">Review your design and download your estimate.</p>
 

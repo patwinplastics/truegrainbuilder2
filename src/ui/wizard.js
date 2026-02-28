@@ -8,11 +8,10 @@ export function goToStep(step) {
     if (step > state.currentStep && !validateStep(state.currentStep)) return;
     updateState({ currentStep: step });
 
-    // Show/hide wizard step content sections
+    // Show only the active step, hide all others
     document.querySelectorAll('.wizard-step').forEach(el => {
         const isTarget = +el.dataset.step === step;
         el.classList.toggle('active', isTarget);
-        el.classList.toggle('hidden', !isTarget);
     });
 
     // Update progress indicator circles
