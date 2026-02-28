@@ -62,7 +62,7 @@ export function initScene() {
         powerPreference: 'high-performance'
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -81,7 +81,7 @@ export function initScene() {
     const sun = new THREE.DirectionalLight(0xffffff, 0.8);
     sun.position.set(20, 30, 20);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = sun.shadow.mapSize.height = 2048;
+    sun.shadow.mapSize.width = sun.shadow.mapSize.height = 1024;
     Object.assign(sun.shadow.camera, { near: 0.5, far: 100, left: -40, right: 40, top: 40, bottom: -40 });
     scene.add(sun);
 
@@ -121,12 +121,24 @@ const debouncedBuild = debounce(() => {
 
 export function buildDeck() { debouncedBuild(); }
 
+// Properly dispose all geometry in a group before clearing it
+function disposeGroupChildren(group) {
+    group.traverse(child => {
+        if (child.isMesh) {
+            child.geometry?.dispose();
+            // Materials are cached/shared — do NOT dispose here
+        }
+    });
+    while (group.children.length > 0) group.remove(group.children[0]);
+}
+
 function executeBuildDeck() {
     if (!deckGroup || !sceneInitialized || contextLost) return;
     document.getElementById('buildingSpinner')?.classList.remove('hidden');
     isBuilding = true;
 
-    while (deckGroup.children.length > 0) deckGroup.remove(deckGroup.children[0]);
+    // Dispose old geometry to free GPU memory before rebuilding
+    disposeGroupChildren(deckGroup);
 
     const colorConfig = CONFIG.colors.find(c => c.id === state.mainColor) || CONFIG.colors[0];
     try {

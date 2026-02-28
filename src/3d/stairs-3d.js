@@ -5,7 +5,7 @@
 // ============================================================
 import { CONFIG }              from '../config.js';
 import { state }               from '../state.js';
-import { createBoardMaterial } from './materials.js';
+import { createBoardMaterial, materialCache } from './materials.js';
 import { selectOptimalBoardLength } from '../calc/optimizer.js';
 
 // Fallback stringer dimensions (inches -> feet)
@@ -15,8 +15,16 @@ const ST = {
     in: ((CONFIG.stairs.stringerInset     ?? 1.5))  / 12
 };
 
-const stringerMat  = () => new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
-const handrailMat  = () => new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.6 });
+// Cached structural materials — stored in shared materialCache
+// so disposeAllCaches() cleans them up automatically
+const stringerMat = () => {
+    if (!materialCache['_stringer']) materialCache['_stringer'] = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
+    return materialCache['_stringer'];
+};
+const handrailMat = () => {
+    if (!materialCache['_handrail']) materialCache['_handrail'] = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.6 });
+    return materialCache['_handrail'];
+};
 
 // ============================================================
 // Public API
