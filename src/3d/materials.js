@@ -14,10 +14,7 @@ export function preloadTextures() {
         loader.load(
             CONFIG.texturePath + color.file,
             tex => {
-                tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-                tex.minFilter = THREE.LinearFilter;
-                tex.magFilter = THREE.LinearFilter;
-                tex.generateMipmaps = false;
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
                 textureCache[color.id] = tex;
             },
             undefined,
@@ -37,9 +34,8 @@ export function disposeAllCaches() {
 
 /**
  * Create (or return cached) board material.
- * Each board gets its texture stretched once across the face — no tiling.
- * Grain runs along the board length by default; rotated 90° when
- * the board runs along the deck width.
+ * Texture tiles along board length for realistic grain density.
+ * Y repeat is 1.0 so tile boundaries fall at board edges (hidden by gaps).
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
     const rotation = boardRunsAlongWidth ? Math.PI / 2 : 0;
@@ -54,14 +50,10 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 
     const applyTex = (src) => {
         const tex = src.clone();
-        // Clamp to edge — no repeating, no tiling seams
-        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        tex.generateMipmaps = false;
-        // Stretch texture once across the entire board face
-        tex.repeat.set(1, 1);
-        tex.offset.set(0, 0);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        // Tile along board length for grain density; 1 tile across width
+        // so the seam boundary falls exactly at the board edge (invisible)
+        tex.repeat.set(boardLengthFt / 4, 1);
         tex.center.set(0.5, 0.5);
         tex.rotation = rotation;
         tex.needsUpdate = true;
@@ -74,10 +66,7 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
         applyTex(textureCache[colorConfig.id]);
     } else {
         new THREE.TextureLoader().load(CONFIG.texturePath + colorConfig.file, src => {
-            src.wrapS = src.wrapT = THREE.ClampToEdgeWrapping;
-            src.minFilter = THREE.LinearFilter;
-            src.magFilter = THREE.LinearFilter;
-            src.generateMipmaps = false;
+            src.wrapS = src.wrapT = THREE.RepeatWrapping;
             textureCache[colorConfig.id] = src;
             applyTex(src);
         });
