@@ -12,6 +12,8 @@ const ST = {
     in: ((CONFIG.stairs.stringerInset     ?? 1.5))  / 12
 };
 
+const EDGE_OFFSET = CONFIG.boards.thickness / 12; // push stair group just outside fascia
+
 const stringerMat = () => {
     if (!materialCache['_stringer']) materialCache['_stringer'] = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
     return materialCache['_stringer'];
@@ -35,11 +37,44 @@ export function createAllStairs(deckGroup, st) {
         g.name = `stair_${stair.id}`;
         if (stair.shape === 'l-shaped' && dims.lShapedData) buildLShapedStair(stair, dims, g, colorConfig, st);
         else                                                  buildStraightStair(stair, dims, g, colorConfig, st);
-        const pos = getStairWorldPosition(stair, st);
-        g.position.set(pos.x, 0, pos.z);
-        g.rotation.y = getStairRotation(stair.edge);
+        positionStairGroup(g, stair, st);
         deckGroup.add(g);
     });
+}
+
+// Position and orient the stair group so it descends outward from the deck edge.
+// Instead of rotating a -Z flight, we set dirZ/dirX per edge in buildStraightStair
+// and place the group at the correct edge with a small outward offset.
+function positionStairGroup(g, stair, st) {
+    const p = stair.position || 0.5;
+    const edge = stair.edge || 'front';
+    let x = 0, z = 0, rotY = 0;
+
+    switch (edge) {
+        case 'front':
+            x = (p - 0.5) * st.deckLength;
+            z = st.deckWidth / 2 + EDGE_OFFSET;
+            rotY = Math.PI; // -Z -> +Z (outward from front)
+            break;
+        case 'back':
+            x = (p - 0.5) * st.deckLength;
+            z = -(st.deckWidth / 2 + EDGE_OFFSET);
+            rotY = 0; // -Z stays -Z (outward from back)
+            break;
+        case 'left':
+            x = -(st.deckLength / 2 + EDGE_OFFSET);
+            z = (p - 0.5) * st.deckWidth;
+            rotY = Math.PI / 2; // -Z -> -X (outward from left)
+            break;
+        case 'right':
+            x = st.deckLength / 2 + EDGE_OFFSET;
+            z = (p - 0.5) * st.deckWidth;
+            rotY = -Math.PI / 2; // -Z -> +X (outward from right)
+            break;
+    }
+
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY;
 }
 
 export function calculateStairDimensions(sc, st) {
@@ -130,17 +165,11 @@ function buildFlightStringers(p) {
     const runsX = Math.abs(p.dirX) > 0.5;
     const mat   = stringerMat();
 
-    // Side stringers only — positioned at each edge with an inset
     const sidePositions = [-p.stairWidthFt / 2 + ST.in, p.stairWidthFt / 2 - ST.in];
-
-    // Center stringer only for wide stairs (>8ft), dropped so top face
-    // sits flush under the treads rather than poking through them
-    const centerYOffset = -ST.w / 2; // shift down by half stringer height
+    const centerYOffset = -ST.w / 2;
     const allPositions  = p.stairWidthFt > 8
         ? [...sidePositions, { lat: 0, yOffset: centerYOffset }]
         : sidePositions.map(lat => ({ lat, yOffset: 0 }));
-
-    // Normalize to objects
     const positions = allPositions.map(item =>
         typeof item === 'number' ? { lat: item, yOffset: 0 } : item
     );
@@ -171,27 +200,46 @@ function buildFlightHandrails(p) {
     const runsX = Math.abs(p.dirX) > 0.5;
     [-1, 1].forEach(side => {
         const lat = side * p.stairWidthFt / 2;
-        const lx = runsX ? 0 : p.originX + lat;
-        const lz = runsX ? p.originZ + lat : 0;
-        const mkPost = (px, py, pz) => { const pm = new THREE.Mesh(new THREE.BoxGeometry(pSz, pH, pSz), mat); pm.position.set(px, py, pz); pm.castShadow = true; p.parentGroup.add(pm); };
+        const lx = runsX ? p.originX : p.originX + lat;
+        const lz = runsX ? p.originZ + lat : p.originZ;
+        const mkPost = (px, py, pz) => {
+            const pm = new THREE.Mesh(new THREE.BoxGeometry(pSz, pH, pSz), mat);
+            pm.position.set(px, py, pz);
+            pm.castShadow = true;
+            p.parentGroup.add(pm);
+        };
         const endY = p.startY - p.riseFt;
-        runsX ? mkPost(p.originX, p.startY + pH / 2, lz) : mkPost(lx, p.startY + pH / 2, p.originZ);
-        runsX ? mkPost(p.originX + p.dirX * p.runFt, endY + pH / 2, lz) : mkPost(lx, endY + pH / 2, p.originZ + p.dirZ * p.runFt);
+        // Top post (at deck edge)
+        if (runsX) mkPost(p.originX, p.startY + pH / 2, lz);
+        else       mkPost(lx, p.startY + pH / 2, p.originZ);
+        // Bottom post (at ground end)
+        if (runsX) mkPost(p.originX + p.dirX * p.runFt, endY + pH / 2, lz);
+        else       mkPost(lx, endY + pH / 2, p.originZ + p.dirZ * p.runFt);
+
         const midY = p.startY + pH - rH / 2 - p.riseFt / 2;
         const rg = new THREE.BoxGeometry(rTh, rH, fLen);
         [midY, midY - (pH - bOff - rH)].forEach(ry => {
             const rail = new THREE.Mesh(rg.clone(), mat);
-            if (runsX) { rail.position.set(p.originX + p.dirX * p.runFt / 2, ry, lz); rail.rotation.z = p.dirX * angle; rail.rotation.y = Math.PI / 2; }
-            else       { rail.position.set(lx, ry, p.originZ + p.dirZ * p.runFt / 2); rail.rotation.x = p.dirZ * angle; }
-            rail.castShadow = true; p.parentGroup.add(rail);
+            if (runsX) {
+                rail.position.set(p.originX + p.dirX * p.runFt / 2, ry, lz);
+                rail.rotation.z = p.dirX * angle;
+                rail.rotation.y = Math.PI / 2;
+            } else {
+                rail.position.set(lx, ry, p.originZ + p.dirZ * p.runFt / 2);
+                rail.rotation.x = p.dirZ * angle;
+            }
+            rail.castShadow = true;
+            p.parentGroup.add(rail);
         });
         const nb = Math.floor(p.runFt / bSp);
         const bH = pH - rH - bOff - rH;
         for (let b = 1; b < nb; b++) {
             const t = b / nb, by = p.startY - t * p.riseFt + bOff + rH + bH / 2;
             const bal = new THREE.Mesh(new THREE.BoxGeometry(bSz, bH, bSz), mat);
-            runsX ? bal.position.set(p.originX + p.dirX * t * p.runFt, by, lz) : bal.position.set(lx, by, p.originZ + p.dirZ * t * p.runFt);
-            bal.castShadow = true; p.parentGroup.add(bal);
+            if (runsX) bal.position.set(p.originX + p.dirX * t * p.runFt, by, lz);
+            else       bal.position.set(lx, by, p.originZ + p.dirZ * t * p.runFt);
+            bal.castShadow = true;
+            p.parentGroup.add(bal);
         }
     });
 }
@@ -221,35 +269,6 @@ function buildLandingRiser(p) {
     const m   = new THREE.Mesh(new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf), createBoardMaterial(p.colorConfig, bl, false, 'lr'));
     m.position.set(0, p.landingY - p.risePerStep / 2 + btf, p.riserZ);
     m.castShadow = true; p.parentGroup.add(m);
-}
-
-// ============================================================
-// Position & rotation helpers
-// ============================================================
-function getStairWorldPosition(stair, st) {
-    const p = stair.position || 0.5;
-    switch (stair.edge) {
-        case 'front': return { x: (p - 0.5) * st.deckLength, z:  st.deckWidth / 2 };
-        case 'back':  return { x: (p - 0.5) * st.deckLength, z: -st.deckWidth / 2 };
-        case 'left':  return { x: -st.deckLength / 2,         z: (p - 0.5) * st.deckWidth };
-        case 'right': return { x:  st.deckLength / 2,         z: (p - 0.5) * st.deckWidth };
-        default:      return { x: 0, z: st.deckWidth / 2 };
-    }
-}
-
-// Flight builder descends in -Z before rotation.
-// Rotation maps -Z outward from the deck edge:
-//   front (z=+half): PI    => -Z becomes +Z (outward)
-//   back  (z=-half): 0     => -Z stays -Z   (outward)
-//   left  (x=-half): -PI/2 => -Z becomes -X (outward)
-//   right (x=+half): +PI/2 => -Z becomes +X (outward)
-function getStairRotation(edge) {
-    return {
-        front:  Math.PI,
-        back:   0,
-        left:  -Math.PI / 2,
-        right:  Math.PI / 2
-    }[edge] ?? Math.PI;
 }
 
 // ============================================================
