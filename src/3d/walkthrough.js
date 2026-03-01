@@ -2,9 +2,9 @@
 // TrueGrain Deck Builder 2 — First-Person Walkthrough
 // ============================================================
 // Desktop + tablet (>= 768px). Phones blocked.
-// C key / crouch button toggles crouch (3'6") vs standing (6'2").
-// On touch devices a virtual joystick appears bottom-left for
-// movement and a look-drag zone covers the rest of the screen.
+// C key / crouch button toggles crouch vs standing.
+// On touch devices a virtual joystick appears bottom-left.
+// World units = FEET throughout.
 // ============================================================
 
 import { CONFIG } from '../config.js';
@@ -15,15 +15,15 @@ import { calculateStairDimensions } from './stairs-3d.js';
 function _isAllowedDevice() { return window.innerWidth >= 768; }
 function _isTouch()         { return window.matchMedia('(pointer: coarse)').matches; }
 
-// ── Height constants ──────────────────────────────────────────
-const EYE_STAND   = 1.88;   // 6'2"  — default standing height (metres)
-const EYE_CROUCH  = 1.07;   // 3'6"  — crouched height
-const CROUCH_SPEED = 0.07;  // lerp rate
+// ── Height constants (FEET — world unit matches scene) ───────────
+const EYE_STAND   = 6.17;   // 6'2"  in feet
+const EYE_CROUCH  = 3.50;   // 3'6"  in feet
+const CROUCH_SPEED = 0.07;  // lerp rate per frame
 
 // ── Motion constants ──────────────────────────────────────────
-const MOVE_SPEED  = 0.07;
-const GRAVITY     = 0.012;
-const SNAP_THRESH = 0.18;
+const MOVE_SPEED  = 0.18;   // ft per frame — slightly faster to match scale
+const GRAVITY     = 0.04;
+const SNAP_THRESH = 0.5;
 const GROUND_Y    = 0.0;
 const BOARD_TH    = CONFIG.boards.thickness / 12;
 
@@ -32,28 +32,19 @@ let _camera    = null;
 let _renderer  = null;
 let _controls  = null;
 let _active    = false;
-let _plc       = null;          // PointerLockControls (desktop only)
+let _plc       = null;
 let _crouching = false;
 let _eyeHeight = EYE_STAND;
 
-// Keyboard movement (desktop)
 const _keys = { w: false, s: false, a: false, d: false };
 let _velY   = 0;
 let _surfaces = [];
 
 // ── Joystick state (touch only) ───────────────────────────────
-const _js = {
-    active:    false,
-    touchId:   null,
-    baseX:     0,   baseY:     0,
-    dx:        0,   dy:        0,
-};
-const _look = {
-    touchId:   null,
-    lastX:     0,   lastY:     0,
-};
-const _LOOK_SENS = 0.003;   // radians per pixel
-const _JS_RADIUS = 55;      // px — max joystick deflection
+const _js = { active: false, touchId: null, baseX: 0, baseY: 0, dx: 0, dy: 0 };
+const _look = { touchId: null, lastX: 0, lastY: 0 };
+const _LOOK_SENS = 0.003;
+const _JS_RADIUS = 55;
 
 // ── Public API ────────────────────────────────────────────────
 
@@ -79,17 +70,12 @@ export function enterWalkthrough() {
     _camera.position.set(sp.x, sp.y, sp.z);
 
     if (_isTouch()) {
-        // Touch path: no PointerLock — manual look + joystick
         _active = true;
         if (_controls) _controls.enabled = false;
         _addTouchListeners();
         _showHUD(true);
     } else {
-        // Desktop path: PointerLock
-        if (!THREE.PointerLockControls) {
-            console.warn('PointerLockControls not loaded');
-            return false;
-        }
+        if (!THREE.PointerLockControls) { console.warn('PointerLockControls not loaded'); return false; }
         _plc = new THREE.PointerLockControls(_camera, _renderer.domElement);
         _plc.addEventListener('lock',   _onLock);
         _plc.addEventListener('unlock', _onUnlock);
@@ -100,11 +86,7 @@ export function enterWalkthrough() {
 
 export function exitWalkthrough() {
     if (!_active) return;
-    if (_isTouch()) {
-        _doExitTouch();
-    } else {
-        _plc?.unlock();
-    }
+    _isTouch() ? _doExitTouch() : _plc?.unlock();
 }
 
 export const isWalkthroughActive = () => _active;
@@ -112,19 +94,14 @@ export const isWalkthroughActive = () => _active;
 export function tickWalkthrough() {
     if (!_active) return;
 
-    if (_isTouch()) {
-        _tickTouch();
-    } else {
-        if (!_plc?.isLocked) return;
-        _tickDesktop();
-    }
+    _isTouch() ? _tickTouch() : (_plc?.isLocked && _tickDesktop());
 
-    // Smooth crouch lerp (both paths)
+    // Smooth crouch lerp
     const targetEye = _crouching ? EYE_CROUCH : EYE_STAND;
     _eyeHeight += (targetEye - _eyeHeight) * CROUCH_SPEED;
-    if (Math.abs(_eyeHeight - targetEye) < 0.005) _eyeHeight = targetEye;
+    if (Math.abs(_eyeHeight - targetEye) < 0.01) _eyeHeight = targetEye;
 
-    // Vertical / gravity (both paths)
+    // Vertical / gravity
     const pos      = _camera.position;
     const surfaceY = _getSurfaceY(pos.x, pos.z);
     const targetY  = surfaceY + _eyeHeight;
@@ -138,12 +115,10 @@ export function tickWalkthrough() {
     }
 
     _clampToBounds(pos);
-    _updateCrouchHUD();
     if (_isTouch()) _updateJoystickVisual();
 }
 
 // ── Desktop tick ──────────────────────────────────────────────
-
 function _tickDesktop() {
     if (_keys.w) _plc.moveForward(MOVE_SPEED);
     if (_keys.s) _plc.moveForward(-MOVE_SPEED);
@@ -152,12 +127,10 @@ function _tickDesktop() {
 }
 
 // ── Touch tick ───────────────────────────────────────────────
-
 function _tickTouch() {
     if (!_js.active) return;
-    const nx = _js.dx / _JS_RADIUS;  // -1 to +1
-    const nz = _js.dy / _JS_RADIUS;
-    // Derive forward/right vectors from camera yaw only (ignore pitch)
+    const nx  = _js.dx / _JS_RADIUS;
+    const nz  = _js.dy / _JS_RADIUS;
     const yaw = _camera.rotation.y;
     const fwdX = -Math.sin(yaw), fwdZ = -Math.cos(yaw);
     const rtX  =  Math.cos(yaw), rtZ  = -Math.sin(yaw);
@@ -165,15 +138,13 @@ function _tickTouch() {
     _camera.position.z += (fwdZ * -nz + rtZ * nx) * MOVE_SPEED;
 }
 
-// ── PointerLock callbacks (desktop) ──────────────────────────
-
+// ── PointerLock callbacks ─────────────────────────────────────
 function _onLock() {
     _active = true;
     if (_controls) _controls.enabled = false;
     _addKeyListeners();
     _showHUD(true);
 }
-
 function _onUnlock() {
     _active = false;
     if (_controls) _controls.enabled = true;
@@ -186,7 +157,6 @@ function _onUnlock() {
 }
 
 // ── Touch enter/exit ──────────────────────────────────────────
-
 function _doExitTouch() {
     _active = false;
     if (_controls) _controls.enabled = true;
@@ -197,33 +167,22 @@ function _doExitTouch() {
     _resetCamera();
 }
 
-// ── Touch event handlers ─────────────────────────────────────
-//
-// Left 30% of screen = joystick zone.
-// Right 70% = look drag zone.
-// We handle up to 2 simultaneous touches.
-
+// ── Touch events ──────────────────────────────────────────────
 function _onTouchStart(e) {
     e.preventDefault();
     for (const t of e.changedTouches) {
         const leftZone = t.clientX < window.innerWidth * 0.35;
         if (leftZone && !_js.active) {
-            _js.active  = true;
-            _js.touchId = t.identifier;
-            _js.baseX   = t.clientX;
-            _js.baseY   = t.clientY;
+            _js.active = true; _js.touchId = t.identifier;
+            _js.baseX = t.clientX; _js.baseY = t.clientY;
             _js.dx = 0; _js.dy = 0;
-            // Move joystick base to touch position
             const base = document.getElementById('wtJsBase');
             if (base) { base.style.left = (t.clientX - 55) + 'px'; base.style.top = (t.clientY - 55) + 'px'; }
         } else if (!leftZone && _look.touchId === null) {
-            _look.touchId = t.identifier;
-            _look.lastX   = t.clientX;
-            _look.lastY   = t.clientY;
+            _look.touchId = t.identifier; _look.lastX = t.clientX; _look.lastY = t.clientY;
         }
     }
 }
-
 function _onTouchMove(e) {
     e.preventDefault();
     for (const t of e.changedTouches) {
@@ -231,28 +190,19 @@ function _onTouchMove(e) {
             _js.dx = Math.max(-_JS_RADIUS, Math.min(_JS_RADIUS, t.clientX - _js.baseX));
             _js.dy = Math.max(-_JS_RADIUS, Math.min(_JS_RADIUS, t.clientY - _js.baseY));
         } else if (t.identifier === _look.touchId) {
-            const dx = t.clientX - _look.lastX;
-            const dy = t.clientY - _look.lastY;
-            _camera.rotation.y  -= dx * _LOOK_SENS;
-            _camera.rotation.x  -= dy * _LOOK_SENS;
-            // Clamp pitch to avoid flipping over
-            _camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, _camera.rotation.x));
-            _look.lastX = t.clientX;
-            _look.lastY = t.clientY;
+            _camera.rotation.y -= (t.clientX - _look.lastX) * _LOOK_SENS;
+            _camera.rotation.x -= (t.clientY - _look.lastY) * _LOOK_SENS;
+            _camera.rotation.x  = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, _camera.rotation.x));
+            _look.lastX = t.clientX; _look.lastY = t.clientY;
         }
     }
 }
-
 function _onTouchEnd(e) {
     for (const t of e.changedTouches) {
-        if (t.identifier === _js.touchId) {
-            _js.active = false; _js.touchId = null; _js.dx = 0; _js.dy = 0;
-        } else if (t.identifier === _look.touchId) {
-            _look.touchId = null;
-        }
+        if (t.identifier === _js.touchId)   { _js.active = false; _js.touchId = null; _js.dx = 0; _js.dy = 0; }
+        if (t.identifier === _look.touchId) { _look.touchId = null; }
     }
 }
-
 function _addTouchListeners() {
     const el = _renderer.domElement;
     el.addEventListener('touchstart', _onTouchStart, { passive: false });
@@ -266,16 +216,13 @@ function _removeTouchListeners() {
     el.removeEventListener('touchend',   _onTouchEnd);
 }
 
-// ── Joystick visual update ────────────────────────────────────
-
+// ── Joystick visual ─────────────────────────────────────────────
 function _updateJoystickVisual() {
     const knob = document.getElementById('wtJsKnob');
-    if (!knob) return;
-    knob.style.transform = `translate(calc(-50% + ${_js.dx}px), calc(-50% + ${_js.dy}px))`;
+    if (knob) knob.style.transform = `translate(calc(-50% + ${_js.dx}px), calc(-50% + ${_js.dy}px))`;
 }
 
-// ── Keyboard (desktop) ────────────────────────────────────────
-
+// ── Keyboard ──────────────────────────────────────────────────
 function _keyDown(e) {
     const k = e.key.toLowerCase();
     if (k === 'w' || k === 'arrowup')    _keys.w = true;
@@ -296,27 +243,20 @@ function _addKeyListeners()    { window.addEventListener('keydown', _keyDown); w
 function _removeKeyListeners() { window.removeEventListener('keydown', _keyDown); window.removeEventListener('keyup', _keyUp); Object.keys(_keys).forEach(k => _keys[k] = false); }
 
 // ── Walk button ───────────────────────────────────────────────
-
 function _syncWalkBtnVisibility() {
     const btn = document.getElementById('walkBtn');
-    if (!btn) return;
-    btn.style.display = _isAllowedDevice() ? '' : 'none';
+    if (btn) btn.style.display = _isAllowedDevice() ? '' : 'none';
 }
 
 // ── Camera reset ──────────────────────────────────────────────
-
 function _resetCamera() {
     const m = Math.max(state.deckLength, state.deckWidth);
     _camera.position.set(m * 1.4, state.deckHeight + m * 0.9, m * 1.4);
     _camera.rotation.set(0, 0, 0);
-    if (_controls) {
-        _controls.target.set(0, state.deckHeight / 2, 0);
-        _controls.update();
-    }
+    if (_controls) { _controls.target.set(0, state.deckHeight / 2, 0); _controls.update(); }
 }
 
 // ── Surface map ───────────────────────────────────────────────
-
 function _buildSurfaces() {
     _surfaces = [];
     const dH = state.deckHeight, dL = state.deckLength / 2, dW = state.deckWidth / 2;
@@ -339,7 +279,6 @@ function _addStairSurfaces(sc, dims) {
     const tdf     = dims.treadDepth / 12;
     const rps     = dims.actualRise / 12;
     const toWorld = _makeEdgeTransform(edge, pos, state);
-
     if (sc.shape === 'l-shaped' && dims.lShapedData) {
         const ld    = dims.lShapedData;
         const sign  = ld.turnDirection === 'left' ? -1 : 1;
@@ -386,8 +325,7 @@ function _makeEdgeTransform(edge, posNorm, st) {
 
 function _getSurfaceY(x, z) {
     let best = GROUND_Y;
-    const sorted = [..._surfaces].sort((a, b) => b.y - a.y);
-    for (const s of sorted) {
+    for (const s of [..._surfaces].sort((a, b) => b.y - a.y)) {
         if (x >= s.minX && x <= s.maxX && z >= s.minZ && z <= s.maxZ) { best = s.y; break; }
     }
     return best;
@@ -411,66 +349,45 @@ function _getStartPosition() {
 
 function _clampToBounds(pos) {
     const pad = 22;
-    const minX = -state.deckLength / 2 - pad, maxX = state.deckLength / 2 + pad;
-    const minZ = -state.deckWidth  / 2 - pad, maxZ = state.deckWidth  / 2 + pad;
-    pos.x = Math.max(minX, Math.min(maxX, pos.x));
-    pos.z = Math.max(minZ, Math.min(maxZ, pos.z));
+    pos.x = Math.max(-state.deckLength / 2 - pad, Math.min(state.deckLength / 2 + pad, pos.x));
+    pos.z = Math.max(-state.deckWidth  / 2 - pad, Math.min(state.deckWidth  / 2 + pad, pos.z));
     if (pos.y < GROUND_Y + _eyeHeight) pos.y = GROUND_Y + _eyeHeight;
 }
 
 // ── HUD ───────────────────────────────────────────────────────
-// Desktop: WASD hint + C to crouch + ESC hint
-// Touch:   Joystick ring/knob bottom-left + crouch button + close button
+// Height labels removed per design. Crouch state shown by button text only.
 
 function _showHUD(visible) {
     let hud = document.getElementById('walkthroughHUD');
-
     if (!visible) {
         if (hud) hud.classList.add('wt-hud--hidden');
         _destroyJoystick();
         return;
     }
-
-    // Build HUD once
     if (!hud) {
         hud = document.createElement('div');
         hud.id = 'walkthroughHUD';
         if (_isTouch()) {
             hud.innerHTML = `
                 <div class="wt-hud__inner wt-hud__inner--touch">
-                    <div class="wt-hud__crouch-row">
+                    <div class="wt-hud__btn-row">
                         <button id="wtCrouchBtn" class="wt-hud__crouch-btn">Crouch</button>
-                        <span class="wt-hud__crouch-label" id="wtCrouchLabel">Standing  6'2"</span>
-                        <button id="wtExitBtn" class="wt-hud__exit-btn">Exit</button>
+                        <button id="wtExitBtn"   class="wt-hud__exit-btn">Exit</button>
                     </div>
                 </div>`;
         } else {
             hud.innerHTML = `
                 <div class="wt-hud__inner">
-                    <div class="wt-hud__keys-row">
-                        <span class="wt-hud__keys">W A S D &nbsp;&bull;&nbsp; Mouse to look &nbsp;&bull;&nbsp; C to crouch &nbsp;&bull;&nbsp; ESC to exit</span>
-                    </div>
-                    <div class="wt-hud__crouch-row">
-                        <span class="wt-hud__crouch-label" id="wtCrouchLabel">Standing  6'2"</span>
-                    </div>
+                    <span class="wt-hud__keys">W A S D &nbsp;&bull;&nbsp; Mouse to look &nbsp;&bull;&nbsp; C to crouch &nbsp;&bull;&nbsp; ESC to exit</span>
                 </div>`;
         }
         document.body.appendChild(hud);
-
-        // Wire touch buttons
         if (_isTouch()) {
-            document.getElementById('wtCrouchBtn')?.addEventListener('click', () => {
-                _crouching = !_crouching;
-                _updateCrouchHUD();
-            });
-            document.getElementById('wtExitBtn')?.addEventListener('click', () => exitWalkthrough());
+            document.getElementById('wtCrouchBtn')?.addEventListener('click', () => { _crouching = !_crouching; _updateCrouchHUD(); });
+            document.getElementById('wtExitBtn')?.addEventListener('click',   () => exitWalkthrough());
         }
     }
-
     hud.classList.remove('wt-hud--hidden');
-    _updateCrouchHUD();
-
-    // Build joystick for touch
     if (_isTouch()) _buildJoystick();
 }
 
@@ -489,16 +406,7 @@ function _destroyJoystick() {
 }
 
 function _updateCrouchHUD() {
-    const el  = document.getElementById('wtCrouchLabel');
+    // Only the button text changes — no height numbers shown
     const btn = document.getElementById('wtCrouchBtn');
-    if (!el) return;
-    if (_crouching) {
-        el.textContent = "Crouching  3'6\"";
-        el.classList.add('wt-hud__crouch-label--active');
-        if (btn) btn.textContent = 'Stand Up';
-    } else {
-        el.textContent = "Standing  6'2\"";
-        el.classList.remove('wt-hud__crouch-label--active');
-        if (btn) btn.textContent = 'Crouch';
-    }
+    if (btn) btn.textContent = _crouching ? 'Stand Up' : 'Crouch';
 }
