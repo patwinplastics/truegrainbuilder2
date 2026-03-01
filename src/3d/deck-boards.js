@@ -49,15 +49,13 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 //      [outer-A, outer-B, inner-B, inner-A]
 //
 // xMin/xMax/zMin/zMax: bounding box of THIS board's vertices.
+//   Each board gets its own bounds so the texture UV spans 0..1
+//   across the board's actual footprint (not the full deck).
 //
 // swapUV: controls grain direction by swapping U and V.
 //   Texture grain runs along the V axis (image vertical).
 //   true  -> V maps to normalized X -> grain along X (FRONT/BACK)
 //   false -> V maps to normalized Z -> grain along Z (LEFT/RIGHT)
-//
-// Top and bottom faces use center-fan triangulation (4 tris per
-// face) to eliminate the diagonal UV interpolation seam that
-// occurs when a trapezoid is split into 2 triangles.
 // ============================================================
 function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, material) {
     function uv(x, z) {
@@ -66,35 +64,22 @@ function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, mater
         return swapUV ? [bv, bu] : [bu, bv];
     }
 
-    // Center point of the quad (average of 4 corners)
-    const cx = (pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) / 4;
-    const cz = (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) / 4;
-
     const positions = [
-        // Bottom corners 0-3
         [pts[0][0], yBot, pts[0][1]],
         [pts[1][0], yBot, pts[1][1]],
         [pts[2][0], yBot, pts[2][1]],
         [pts[3][0], yBot, pts[3][1]],
-        // Top corners 4-7
         [pts[0][0], yTop, pts[0][1]],
         [pts[1][0], yTop, pts[1][1]],
         [pts[2][0], yTop, pts[2][1]],
         [pts[3][0], yTop, pts[3][1]],
-        // Bottom center 8
-        [cx, yBot, cz],
-        // Top center 9
-        [cx, yTop, cz],
     ];
 
     const uvMap = positions.map(p => uv(p[0], p[2]));
 
     const triangles = [
-        // Top face: center-fan from vertex 9 (no diagonal seam)
-        [9, 4, 5], [9, 5, 6], [9, 6, 7], [9, 7, 4],
-        // Bottom face: center-fan from vertex 8
-        [8, 1, 0], [8, 2, 1], [8, 3, 2], [8, 0, 3],
-        // Side faces (rectangles, 2 tris each is fine)
+        [4, 6, 5], [4, 7, 6],   // top
+        [0, 1, 2], [0, 2, 3],   // bottom
         [0, 5, 1], [0, 4, 5],   // outer edge
         [1, 6, 2], [1, 5, 6],   // right miter
         [2, 7, 3], [2, 6, 7],   // inner edge
@@ -145,21 +130,25 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         const mat = createBoardMaterial(bColor, dL, true, `bframe${i}`);
 
         // FRONT: runs along X, narrow in Z
+        // x spans full length (-L0 to L0), z spans one board width (-W0 to -W1)
         deckGroup.add(buildMiteredMesh(
             [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
             yBot, yTop, -L0, L0, -W0, -W1, true, mat
         ));
         // BACK: runs along X, narrow in Z
+        // x spans full length (-L0 to L0), z spans one board width (W1 to W0)
         deckGroup.add(buildMiteredMesh(
             [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
             yBot, yTop, -L0, L0, W1, W0, true, mat
         ));
         // LEFT: runs along Z, narrow in X
+        // x spans one board width (-L0 to -L1), z spans full width (-W0 to W0)
         deckGroup.add(buildMiteredMesh(
             [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
             yBot, yTop, -L0, -L1, -W0, W0, false, mat
         ));
         // RIGHT: runs along Z, narrow in X
+        // x spans one board width (L1 to L0), z spans full width (-W0 to W0)
         deckGroup.add(buildMiteredMesh(
             [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
             yBot, yTop, L1, L0, -W0, W0, false, mat
