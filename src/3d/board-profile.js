@@ -27,52 +27,76 @@ export const BOARD_PROFILE = {
 export const BOARD_GAP_FT   = 0.125 * IN;
 export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
 
-// ── Minimal ear-clipping triangulator ────────────────────────────────────────
-// Handles simple (non-self-intersecting) polygons including non-convex ones.
-// Returns flat index array [i0,i1,i2, ...] with CCW winding for Y-up space.
+// ── Ear-clipping triangulator ──────────────────────────────────────────
+// pts: array of [x, y] in any coordinate system.
+// Returns flat [i0,i1,i2,...] index array.
+// area2 sign convention: positive = CCW in standard Y-up math.
+// Our profile uses Y-down (Y negative = downward), which FLIPS the sign,
+// so a CW-looking profile in 3D actually has positive area2 here.
+// The reflex test therefore uses >= 0 (keep CCW ears in Y-down space).
 function earclip(pts) {
   const n = pts.length;
   if (n < 3) return [];
-  const idx = Array.from({ length: n }, (_, i) => i);
+
+  // Determine dominant winding from signed area so we handle both orderings.
+  let signedArea = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    signedArea += (pts[j][0] - pts[i][0]) * (pts[j][1] + pts[i][1]);
+  }
+  // signedArea > 0 means CW in Y-down (screen) space; we want CCW for area2 > 0 = convex.
+  // If CW, reverse so ears are consistently identified.
+  const ordered = signedArea > 0 ? pts.slice().reverse() : pts;
+
+  const idx = Array.from({ length: ordered.length }, (_, i) => i);
   const tris = [];
 
   function area2(a, b, c) {
-    return (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1])
-         - (pts[c][0] - pts[a][0]) * (pts[b][1] - pts[a][1]);
+    return (ordered[b][0] - ordered[a][0]) * (ordered[c][1] - ordered[a][1])
+         - (ordered[c][0] - ordered[a][0]) * (ordered[b][1] - ordered[a][1]);
   }
+
   function inTriangle(ax, ay, bx, by, cx, cy, px, py) {
-    const d1 = (px-bx)*(ay-by) - (ax-bx)*(py-by);
-    const d2 = (px-cx)*(by-cy) - (bx-cx)*(py-cy);
-    const d3 = (px-ax)*(cy-ay) - (cx-ax)*(py-ay);
-    const neg = (d1<0)||(d2<0)||(d3<0);
-    const pos = (d1>0)||(d2>0)||(d3>0);
-    return !(neg && pos);
+    const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+    const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+    const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
   }
+
   function isEar(i) {
     const len = idx.length;
     const prev = idx[(i - 1 + len) % len];
     const curr = idx[i];
     const next = idx[(i + 1) % len];
-    if (area2(prev, curr, next) <= 0) return false; // reflex
-    const ax = pts[prev][0], ay = pts[prev][1];
-    const bx = pts[curr][0], by = pts[curr][1];
-    const cx = pts[next][0], cy = pts[next][1];
+    if (area2(prev, curr, next) <= 0) return false; // reflex or degenerate
+    const ax = ordered[prev][0], ay = ordered[prev][1];
+    const bx = ordered[curr][0], by = ordered[curr][1];
+    const cx = ordered[next][0], cy = ordered[next][1];
     for (let j = 0; j < len; j++) {
       const v = idx[j];
       if (v === prev || v === curr || v === next) continue;
-      if (inTriangle(ax, ay, bx, by, cx, cy, pts[v][0], pts[v][1])) return false;
+      if (inTriangle(ax, ay, bx, by, cx, cy, ordered[v][0], ordered[v][1])) return false;
     }
     return true;
   }
+
+  // Map ordered indices back to original pt indices if we reversed.
+  const origIdx = signedArea > 0
+    ? Array.from({ length: n }, (_, i) => n - 1 - i)
+    : Array.from({ length: n }, (_, i) => i);
 
   let remaining = idx.length;
   let attempts = 0;
   let i = 0;
   while (remaining > 3) {
-    if (attempts > remaining * 2) break; // guard against degenerate input
+    if (attempts > remaining * 2) break;
     if (isEar(i % remaining)) {
       const len = idx.length;
-      tris.push(idx[(i - 1 + len) % len], idx[i % len], idx[(i + 1) % len]);
+      tris.push(
+        origIdx[idx[(i - 1 + len) % len]],
+        origIdx[idx[i % len]],
+        origIdx[idx[(i + 1) % len]]
+      );
       idx.splice(i % remaining, 1);
       remaining--;
       attempts = 0;
@@ -82,7 +106,7 @@ function earclip(pts) {
     i++;
     if (i >= remaining) i = 0;
   }
-  if (remaining === 3) tris.push(idx[0], idx[1], idx[2]);
+  if (remaining === 3) tris.push(origIdx[idx[0]], origIdx[idx[1]], origIdx[idx[2]]);
   return tris;
 }
 
@@ -169,7 +193,6 @@ const PROFILE_FT = PROFILE_IN.map(([x, y]) => [x * IN, y * IN]);
 const N = PROFILE_FT.length;
 const HALF_W = BOARD_PROFILE.widthFt / 2;
 
-// Cached earcut result — computed once, reused for every board.
 let _capTris = null;
 function getCapTris() {
   if (!_capTris) _capTris = earclip(PROFILE_FT);
@@ -205,10 +228,8 @@ export function createBoardGeometry(lengthFt) {
 
   for (let i = 0; i < N; i++) {
     const j  = (i + 1) % N;
-    const ni = i,     nj = j;
-    const fi = N + i, fj = N + j;
-    sideIndices.push(ni, fi, fj);
-    sideIndices.push(ni, fj, nj);
+    sideIndices.push(i, N+i, N+j);
+    sideIndices.push(i, N+j, j);
   }
 
   const tris = getCapTris();
@@ -216,8 +237,8 @@ export function createBoardGeometry(lengthFt) {
   const FC = 3 * N;
   for (let t = 0; t < tris.length; t += 3) {
     const a = tris[t], b = tris[t+1], c = tris[t+2];
-    capIndices.push(NC + a, NC + b, NC + c); // near: faces -Z
-    capIndices.push(FC + a, FC + c, FC + b); // far:  reversed, faces +Z
+    capIndices.push(NC + a, NC + b, NC + c);
+    capIndices.push(FC + a, FC + c, FC + b); // reversed for far cap
   }
 
   const allIndices = [...sideIndices, ...capIndices];
