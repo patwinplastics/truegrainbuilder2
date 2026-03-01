@@ -18,7 +18,7 @@ export function preloadTextures() {
             tex => {
                 tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
                 tex.anisotropy = maxAniso;
-                textureCache[color.id] = src;
+                textureCache[color.id] = tex;
             },
             undefined,
             () => console.warn(`Texture load failed: ${color.file}`)
