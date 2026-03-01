@@ -1,7 +1,7 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — First-Person Walkthrough
 // ============================================================
-// Desktop-only (pointer lock requires a real mouse).
+// Available on desktop and tablet. Blocked on phones (<768px).
 // C key toggles crouch (3'6") vs standing (5'10").
 // ============================================================
 
@@ -9,20 +9,17 @@ import { CONFIG } from '../config.js';
 import { state }  from '../state.js';
 import { calculateStairDimensions } from './stairs-3d.js';
 
-// ── Desktop guard ─────────────────────────────────────────────
-// PointerLock is meaningless on touch devices. We block the entire
-// feature if the primary input is coarse (touch) or the viewport
-// is narrow enough to indicate a tablet/phone.
-function _isDesktop() {
-    if (window.matchMedia('(pointer: coarse)').matches) return false;
-    if (window.innerWidth < 1024) return false;
-    return true;
+// ── Device guard ──────────────────────────────────────────────
+// Block on phones only (viewport < 768px).
+// Tablets (768px+) and desktops both allowed.
+function _isAllowedDevice() {
+    return window.innerWidth >= 768;
 }
 
 // ── Height constants ──────────────────────────────────────────
-const EYE_STAND  = 1.78;   // 5'10" — default standing height (metres)
-const EYE_CROUCH = 1.07;   // 3'6"  — crouched height
-const CROUCH_SPEED = 0.06; // lerp rate for smooth crouch transition
+const EYE_STAND   = 1.78;   // 5'10" — default standing height (metres)
+const EYE_CROUCH  = 1.07;   // 3'6"  — crouched height
+const CROUCH_SPEED = 0.06;  // lerp rate for smooth crouch transition
 
 // ── Motion constants ──────────────────────────────────────────
 const MOVE_SPEED  = 0.07;
@@ -37,8 +34,8 @@ let _renderer  = null;
 let _controls  = null;
 let _active    = false;
 let _plc       = null;
-let _crouching = false;         // true while C is held / toggled
-let _eyeHeight = EYE_STAND;    // current target eye height, lerped each frame
+let _crouching = false;
+let _eyeHeight = EYE_STAND;
 
 const _keys   = { w: false, s: false, a: false, d: false };
 let _velY     = 0;
@@ -51,6 +48,9 @@ export function initWalkthrough(camera, renderer, orbitControls) {
     _renderer = renderer;
     _controls = orbitControls;
     _buildSurfaces();
+    // Hide the Walk button entirely on phones
+    _syncWalkBtnVisibility();
+    window.addEventListener('resize', _syncWalkBtnVisibility);
 }
 
 export function refreshWalkthroughSurfaces() {
@@ -58,10 +58,10 @@ export function refreshWalkthroughSurfaces() {
 }
 
 /**
- * Returns false (silently) on touch / narrow-viewport devices.
+ * Returns false silently on phones (< 768px).
  */
 export function enterWalkthrough() {
-    if (!_isDesktop()) return false;
+    if (!_isAllowedDevice()) return false;
     if (_active) return true;
     if (!THREE.PointerLockControls) {
         console.warn('PointerLockControls not loaded');
@@ -89,19 +89,18 @@ export const isWalkthroughActive = () => _active;
 export function tickWalkthrough() {
     if (!_active || !_plc?.isLocked) return;
 
-    // ── Horizontal movement ───────────────────────────────────
+    // ── Horizontal movement ──────────────────────────────────
     if (_keys.w) _plc.moveForward(MOVE_SPEED);
     if (_keys.s) _plc.moveForward(-MOVE_SPEED);
     if (_keys.a) _plc.moveRight(-MOVE_SPEED);
     if (_keys.d) _plc.moveRight(MOVE_SPEED);
 
-    // ── Smooth crouch lerp ────────────────────────────────────
+    // ── Smooth crouch lerp ──────────────────────────────────
     const targetEye = _crouching ? EYE_CROUCH : EYE_STAND;
     _eyeHeight += (targetEye - _eyeHeight) * CROUCH_SPEED;
-    // Snap to avoid perpetual micro-lerp
     if (Math.abs(_eyeHeight - targetEye) < 0.005) _eyeHeight = targetEye;
 
-    // ── Vertical / stair / gravity ────────────────────────────
+    // ── Vertical / stair / gravity ───────────────────────────
     const pos      = _camera.position;
     const surfaceY = _getSurfaceY(pos.x, pos.z);
     const targetY  = surfaceY + _eyeHeight;
@@ -116,9 +115,15 @@ export function tickWalkthrough() {
     }
 
     _clampToBounds(pos);
-
-    // ── Keep crouch indicator in sync ─────────────────────────
     _updateCrouchHUD();
+}
+
+// ── Walk button visibility ──────────────────────────────────────
+
+function _syncWalkBtnVisibility() {
+    const btn = document.getElementById('walkBtn');
+    if (!btn) return;
+    btn.style.display = _isAllowedDevice() ? '' : 'none';
 }
 
 // ── Lock / Unlock ─────────────────────────────────────────────
@@ -271,8 +276,6 @@ function _clampToBounds(pos) {
 }
 
 // ── HUD ───────────────────────────────────────────────────────
-// Simple two-line HUD: controls hint on top, crouch status below.
-// No mouse interaction needed — everything is keyboard-driven.
 
 function _showHUD(visible) {
     let hud = document.getElementById('walkthroughHUD');
@@ -302,10 +305,10 @@ function _updateCrouchHUD() {
     const el = document.getElementById('wtCrouchLabel');
     if (!el) return;
     if (_crouching) {
-        el.textContent = 'Crouching  3\'6"';
+        el.textContent = "Crouching  3'6\"";
         el.classList.add('wt-hud__crouch-label--active');
     } else {
-        el.textContent = 'Standing  5\'10"';
+        el.textContent = "Standing  5'10\"";
         el.classList.remove('wt-hud__crouch-label--active');
     }
 }
