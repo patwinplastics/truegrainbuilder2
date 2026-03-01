@@ -10,6 +10,14 @@ import { createDeckBoardsWithSegments }                       from './deck-board
 import { createDetailedRailings }                             from './railings.js';
 import { createAllStairs }                                    from './stairs-3d.js';
 import { determinePattern }                                   from '../calc/estimator.js';
+import {
+    initWalkthrough,
+    refreshWalkthroughSurfaces,
+    enterWalkthrough,
+    exitWalkthrough,
+    tickWalkthrough,
+    isWalkthroughActive
+} from './walkthrough.js';
 
 let scene, camera, renderer, controls;
 let deckGroup        = null;
@@ -97,6 +105,12 @@ export function initScene() {
     document.getElementById('sceneLoading')?.classList.add('hidden');
     animate();
 
+    // Init walkthrough module now that camera/renderer/controls exist
+    initWalkthrough(camera, renderer, controls);
+
+    // Wire the Walk button (may already be in DOM)
+    _bindWalkButton();
+
     window.addEventListener('resize', debounce(onWindowResize, 250));
     window.addEventListener('beforeunload', disposeAllCaches);
 }
@@ -104,7 +118,11 @@ export function initScene() {
 function animate() {
     if (contextLost) return;
     requestAnimationFrame(animate);
-    controls?.update();
+    if (isWalkthroughActive()) {
+        tickWalkthrough();
+    } else {
+        controls?.update();
+    }
     if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
@@ -153,6 +171,9 @@ function executeBuildDeck() {
         camera.position.set(m * 1.4, state.deckHeight + m * 0.9, m * 1.4);
         controls.update();
         updateBoardLegend();
+
+        // Refresh walkable surface map after every deck rebuild
+        refreshWalkthroughSurfaces();
     } catch (e) {
         console.error('Error building deck:', e);
     }
@@ -164,6 +185,7 @@ function executeBuildDeck() {
 
 export function setCameraView(type) {
     if (!camera || !controls) return;
+    if (isWalkthroughActive()) exitWalkthrough();
     const m = Math.max(state.deckLength, state.deckWidth);
     if (type === 'top') {
         camera.position.set(0, m * 1.8, 0.01);
@@ -179,6 +201,25 @@ export function zoomCamera(factor) {
     if (!camera || !controls) return;
     camera.position.multiplyScalar(factor);
     controls.update();
+}
+
+// ============================================================
+// Walk button wiring
+// ============================================================
+
+function _bindWalkButton() {
+    const btn = document.getElementById('walkBtn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        if (isWalkthroughActive()) {
+            exitWalkthrough();
+        } else {
+            const ok = enterWalkthrough();
+            if (!ok) {
+                alert('Walkthrough requires PointerLockControls. Please ensure the CDN script is loaded.');
+            }
+        }
+    });
 }
 
 function updateBoardLegend() {
