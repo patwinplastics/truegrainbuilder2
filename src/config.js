@@ -6,7 +6,7 @@ export const CONFIG = {
         availableLengths: [12, 16, 20],
         width: 5.5,
         thickness: 1,
-        gap: 0.1875,
+        gap: 0.125,          // 1/8" install gap (updated from 3/16")
         maxContinuousRun: 20
     },
     joists: {
@@ -36,10 +36,6 @@ export const CONFIG = {
         stringerThickness: 1.5,
         stringerWidth: 9.25,
         stringerInset: 1.5,
-        // Center stringer thresholds (in feet)
-        // Under centerStringerMinWidth: 2 stringers (sides only)
-        // centerStringerMinWidth to doubleCenter: 3 stringers (sides + 1 center)
-        // Above doubleCenter: 4 stringers (sides + 2 centers)
         centerStringerMinWidth: 3,
         doubleCenterStringerMinWidth: 6
     },
