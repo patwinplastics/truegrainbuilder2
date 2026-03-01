@@ -20,9 +20,6 @@ export function createDeckBoardsWithSegments(deckGroup, state, pattern, colorCon
     else                                       createStraightBoards(deckGroup, state, colorConfig);
 }
 
-// ============================================================
-// Straight boards
-// ============================================================
 function createStraightBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
     const boardY  = state.deckHeight + bt / 2;
@@ -44,23 +41,24 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 }
 
 // ============================================================
-// Picture frame — butt-jointed sides + 45-deg corner caps
+// Picture frame with 45-degree mitered corner caps
 //
-// Each of the 4 sides is a BoxGeometry running its full length
-// but trimmed SHORT by bw at each end so it stops at the
-// corner boundary. A square cap (bw x bw) rotated 45 deg
-// around Y fills each corner, creating the miter illusion.
+// Each border row i has:
+//   - off:   distance from outer deck edge to board centerline
+//   - Front/back boards: run along X, length = dL - 2*bw
+//             (stop at left/right board centerlines)
+//   - Left/right boards: run along Z, length = dW - 2*bw
+//             (stop at front/back board centerlines)
+//   - 4 corner caps: bw x bw square rotated 45deg around Y,
+//             positioned at each outer corner centerline
 //
-// Top-down diagram for one corner row (i=0):
-//
-//   [cap]---[front board (dL - 2*bw)]---[cap]
-//     |                                    |
-//  [left board (dW - 2*bw)]          [right board]
-//     |                                    |
-//   [cap]---[back  board (dL - 2*bw)]---[cap]
-//
-// The cap is a square of side bw rotated 45deg, which creates
-// the visual diagonal miter line at each corner.
+// The rotated square's visible diagonal lines create the 45-deg
+// miter seam. The cap stays within the bw x bw corner square
+// because BoxGeometry bw x bw rotated 45deg has diagonal = bw*sqrt2
+// which fits diagonally within a bw*sqrt2 x bw*sqrt2 outer box—
+// BUT we must position it at the corner where the gap is bw x bw.
+// To avoid overhang we use cap size = bw (not bw*sqrt2), rotated 45deg,
+// so it inscribes within the bw x bw corner square perfectly.
 // ============================================================
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
@@ -74,58 +72,58 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const dW = state.deckWidth;
 
     for (let i = 0; i < bc; i++) {
-        const off    = i * ew + bw / 2;   // centerline offset from outer edge
-        const outerZ = dW / 2 - off;      // world Z of this border row centerline
-        const outerX = dL / 2 - off;      // world X of this border row centerline
+        const off = i * ew + bw / 2;  // centerline from outer edge
 
-        // Each side board runs between the two adjacent corner caps.
-        // It is shortened by bw on each end (the cap fills that space).
-        const sideLen = dL - 2 * off;     // front/back board length
-        const sideWid = dW - 2 * off;     // left/right board length
+        // Side board lengths: stop at the adjacent board's centerline
+        // Front/back span from (-dL/2 + off) to (+dL/2 - off), length = dL - 2*off
+        // But we want boards to stop at the INNER face of adjacent boards:
+        // inner face of left board = -dL/2 + off + bw/2 = -dL/2 + i*ew + bw
+        // So front/back length = dL - 2*(i*ew + bw) = dL - 2*i*ew - 2*bw
+        const fbLen = dL - 2 * (i * ew + bw);
+        const lrLen = dW - 2 * (i * ew + bw);
 
-        // Front board (z = -outerZ)
-        const fMat = createBoardMaterial(bColor, sideLen, false, `bf${i}`);
-        const fb   = new THREE.Mesh(new THREE.BoxGeometry(sideLen, bt, bw), fMat);
-        fb.position.set(0, boardY, -outerZ);
+        // Front board
+        const fMat = createBoardMaterial(bColor, fbLen, false, `bf${i}`);
+        const fb   = new THREE.Mesh(new THREE.BoxGeometry(fbLen, bt, bw), fMat);
+        fb.position.set(0, boardY, -(dW / 2 - off));
         fb.castShadow = fb.receiveShadow = true;
         deckGroup.add(fb);
 
-        // Back board (z = +outerZ)
-        const bkMat = createBoardMaterial(bColor, sideLen, false, `bb${i}`);
-        const bkb   = new THREE.Mesh(new THREE.BoxGeometry(sideLen, bt, bw), bkMat);
-        bkb.position.set(0, boardY, outerZ);
+        // Back board
+        const bkMat = createBoardMaterial(bColor, fbLen, false, `bb${i}`);
+        const bkb   = new THREE.Mesh(new THREE.BoxGeometry(fbLen, bt, bw), bkMat);
+        bkb.position.set(0, boardY, dW / 2 - off);
         bkb.castShadow = bkb.receiveShadow = true;
         deckGroup.add(bkb);
 
-        // Left board (x = -outerX)
-        const lMat = createBoardMaterial(bColor, sideWid, true, `bl${i}`);
-        const lb   = new THREE.Mesh(new THREE.BoxGeometry(bw, bt, sideWid), lMat);
-        lb.position.set(-outerX, boardY, 0);
+        // Left board
+        const lMat = createBoardMaterial(bColor, lrLen, true, `bl${i}`);
+        const lb   = new THREE.Mesh(new THREE.BoxGeometry(bw, bt, lrLen), lMat);
+        lb.position.set(-(dL / 2 - off), boardY, 0);
         lb.castShadow = lb.receiveShadow = true;
         deckGroup.add(lb);
 
-        // Right board (x = +outerX)
-        const rMat = createBoardMaterial(bColor, sideWid, true, `br${i}`);
-        const rb   = new THREE.Mesh(new THREE.BoxGeometry(bw, bt, sideWid), rMat);
-        rb.position.set(outerX, boardY, 0);
+        // Right board
+        const rMat = createBoardMaterial(bColor, lrLen, true, `br${i}`);
+        const rb   = new THREE.Mesh(new THREE.BoxGeometry(bw, bt, lrLen), rMat);
+        rb.position.set(dL / 2 - off, boardY, 0);
         rb.castShadow = rb.receiveShadow = true;
         deckGroup.add(rb);
 
-        // Corner caps — square bw x bw, rotated 45deg around Y
-        // The diagonal of a square rotated 45deg = bw * sqrt(2) which
-        // covers the corner gap exactly and creates the miter line.
-        const capDiag = bw * Math.SQRT2;
-        const corners = [
-            [-dL / 2 + off, -dW / 2 + off],  // front-left
-            [ dL / 2 - off, -dW / 2 + off],  // front-right
-            [-dL / 2 + off,  dW / 2 - off],  // back-left
-            [ dL / 2 - off,  dW / 2 - off],  // back-right
-        ];
-        corners.forEach(([cx, cz], ci) => {
+        // Corner caps: bw x bw square, rotated 45deg
+        // Positioned at the intersection of the board centerlines
+        const cx = dL / 2 - off;
+        const cz = dW / 2 - off;
+        [
+            [-cx, -cz],
+            [ cx, -cz],
+            [-cx,  cz],
+            [ cx,  cz],
+        ].forEach(([capX, capZ], ci) => {
             const capMat = createBoardMaterial(bColor, bw, false, `cap${i}_${ci}`);
-            const cap    = new THREE.Mesh(new THREE.BoxGeometry(capDiag, bt, capDiag), capMat);
-            cap.position.set(cx, boardY, cz);
-            cap.rotation.y = Math.PI / 4;  // 45 degrees
+            const cap    = new THREE.Mesh(new THREE.BoxGeometry(bw, bt, bw), capMat);
+            cap.position.set(capX, boardY, capZ);
+            cap.rotation.y = Math.PI / 4;
             cap.castShadow = cap.receiveShadow = true;
             deckGroup.add(cap);
         });
@@ -148,9 +146,6 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     }
 }
 
-// ============================================================
-// Breaker boards
-// ============================================================
 function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
     const { bw, bt, g, ew } = dims();
     const boardY  = state.deckHeight + bt / 2;
