@@ -16,9 +16,7 @@ const BOARD_TH    = CONFIG.boards.thickness / 12;
 const EDGE_OFFSET = BOARD_TH;
 
 // ============================================================
-// Procedural PT lumber texture for stringers (same look as
-// joists/posts but generated independently so it has unique
-// knot placement on the stairs).
+// Procedural PT lumber texture for stringers
 // ============================================================
 function buildPTTexture() {
     const SIZE = 512;
@@ -189,18 +187,62 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     const ld = dims.lShapedData;
     const rps = dims.actualRise/12, tdf = dims.treadDepth/12, sw = dims.stairWidthFeet;
     const sign = ld.turnDirection === 'left' ? -1 : 1;
-    const rise1 = ld.risersBeforeLanding * rps, rise2 = (dims.numRisers - ld.risersBeforeLanding) * rps;
+    const rise1 = ld.risersBeforeLanding * rps;
+    const rise2 = (dims.numRisers - ld.risersBeforeLanding) * rps;
     const landingY = st.deckHeight - rise1;
-    buildFlightTreads({ stairConfig: sc, dims, colorConfig: cc, parentGroup: g, numTreads: ld.treadsBeforeLanding, numRisers: ld.risersBeforeLanding, risePerStep: rps, treadDepthFt: tdf, stairWidthFt: sw, startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0, flightLabel: 'f1' });
-    buildFlightStringers({ parentGroup: g, stairWidthFt: sw, riseFt: rise1, runFt: ld.run1Feet, startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0, flightLabel: 'f1' });
-    buildLanding({ parentGroup: g, colorConfig: cc, stairWidthFt: sw, landingDepthFt: ld.landingDepthFeet, landingY, centerZ: -ld.run1Feet - ld.landingDepthFeet/2, turnSign: sign, run2Ft: ld.run2Feet });
-    buildLandingRiser({ parentGroup: g, colorConfig: cc, stairWidthFt: sw, risePerStep: rps, landingY, riserZ: -ld.run1Feet });
-    const ox = 0, oz = -ld.run1Feet - ld.landingDepthFeet;
-    buildFlightTreads({ stairConfig: sc, dims, colorConfig: cc, parentGroup: g, numTreads: ld.treadsAfterLanding, numRisers: dims.numRisers - ld.risersBeforeLanding, risePerStep: rps, treadDepthFt: tdf, stairWidthFt: sw, startY: landingY, dirZ: 0, dirX: sign, originX: ox, originZ: oz, flightLabel: 'f2' });
-    buildFlightStringers({ parentGroup: g, stairWidthFt: sw, riseFt: rise2, runFt: ld.run2Feet, startY: landingY, dirZ: 0, dirX: sign, originX: ox, originZ: oz, flightLabel: 'f2' });
+
+    // Flight 1: runs in -Z direction from origin
+    buildFlightTreads({
+        stairConfig: sc, dims, colorConfig: cc, parentGroup: g,
+        numTreads: ld.treadsBeforeLanding, numRisers: ld.risersBeforeLanding,
+        risePerStep: rps, treadDepthFt: tdf, stairWidthFt: sw,
+        startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0, flightLabel: 'f1'
+    });
+    buildFlightStringers({
+        parentGroup: g, stairWidthFt: sw, riseFt: rise1, runFt: ld.run1Feet,
+        startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0, flightLabel: 'f1'
+    });
+
+    // Landing: centered at Z = -(run1 + landingDepth/2), X = 0
+    const landingCenterZ = -(ld.run1Feet + ld.landingDepthFeet / 2);
+    buildLanding({
+        parentGroup: g, colorConfig: cc,
+        stairWidthFt: sw,
+        landingDepthFt: ld.landingDepthFeet,
+        landingY,
+        centerZ: landingCenterZ,
+        turnSign: sign,
+        run2Ft: ld.run2Feet
+    });
+    buildLandingRiser({
+        parentGroup: g, colorConfig: cc,
+        stairWidthFt: sw, risePerStep: rps,
+        landingY, riserZ: -ld.run1Feet
+    });
+
+    // Flight 2: runs in sign*X direction from the far edge of the landing
+    const ox = 0, oz = -(ld.run1Feet + ld.landingDepthFeet);
+    buildFlightTreads({
+        stairConfig: sc, dims, colorConfig: cc, parentGroup: g,
+        numTreads: ld.treadsAfterLanding,
+        numRisers: dims.numRisers - ld.risersBeforeLanding,
+        risePerStep: rps, treadDepthFt: tdf, stairWidthFt: sw,
+        startY: landingY, dirZ: 0, dirX: sign, originX: ox, originZ: oz, flightLabel: 'f2'
+    });
+    buildFlightStringers({
+        parentGroup: g, stairWidthFt: sw, riseFt: rise2, runFt: ld.run2Feet,
+        startY: landingY, dirZ: 0, dirX: sign, originX: ox, originZ: oz, flightLabel: 'f2'
+    });
+
     if (sc.includeHandrails) {
-        buildFlightHandrails({ parentGroup: g, stairWidthFt: sw, riseFt: rise1, runFt: ld.run1Feet, startY: st.deckHeight, originX: 0, originZ: 0, dirZ: -1, dirX: 0, flightLabel: 'f1' });
-        buildFlightHandrails({ parentGroup: g, stairWidthFt: sw, riseFt: rise2, runFt: ld.run2Feet, startY: landingY, originX: ox, originZ: oz, dirZ: 0, dirX: sign, flightLabel: 'f2' });
+        buildFlightHandrails({
+            parentGroup: g, stairWidthFt: sw, riseFt: rise1, runFt: ld.run1Feet,
+            startY: st.deckHeight, originX: 0, originZ: 0, dirZ: -1, dirX: 0, flightLabel: 'f1'
+        });
+        buildFlightHandrails({
+            parentGroup: g, stairWidthFt: sw, riseFt: rise2, runFt: ld.run2Feet,
+            startY: landingY, originX: ox, originZ: oz, dirZ: 0, dirX: sign, flightLabel: 'f2'
+        });
     }
 }
 
@@ -216,14 +258,18 @@ function buildFlightTreads(p) {
         for (let b = 0; b < p.dims.boardsPerTread; b++) {
             const bo = -p.treadDepthFt/2 + b*(bwf+gf) + bwf/2;
             const mat = createBoardMaterial(p.colorConfig, bl, false, `tr_${p.flightLabel}_${step}_${b}`);
-            const geom = runsX ? new THREE.BoxGeometry(bwf, btf, p.stairWidthFt) : new THREE.BoxGeometry(p.stairWidthFt, btf, bwf);
+            const geom = runsX
+                ? new THREE.BoxGeometry(bwf, btf, p.stairWidthFt)
+                : new THREE.BoxGeometry(p.stairWidthFt, btf, bwf);
             const m = new THREE.Mesh(geom, mat);
             m.position.set(cx + p.dirX*bo, sY + btf/2, cz + p.dirZ*bo);
             m.castShadow = m.receiveShadow = true;
             p.parentGroup.add(m);
         }
         const rx = p.originX + p.dirX * ro, rz = p.originZ + p.dirZ * ro;
-        const rg = runsX ? new THREE.BoxGeometry(btf, p.risePerStep, p.stairWidthFt) : new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf);
+        const rg = runsX
+            ? new THREE.BoxGeometry(btf, p.risePerStep, p.stairWidthFt)
+            : new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf);
         const rm = new THREE.Mesh(rg, createBoardMaterial(p.colorConfig, bl, false, `rs_${p.flightLabel}_${step}`));
         rm.position.set(rx, sY - p.risePerStep/2 + btf, rz);
         rm.castShadow = true;
@@ -242,10 +288,12 @@ function buildFlightStringers(p) {
         const cy = p.startY - p.riseFt/2 + yOffset;
         const rH = p.runFt/2;
         if (runsX) {
+            // lat offsets Z for runsX flights
             m.position.set(p.originX + p.dirX*rH, cy, p.originZ + lat);
             m.rotation.z = p.dirX * angle;
             m.rotation.y = Math.PI/2;
         } else {
+            // lat offsets X for runsZ flights
             m.position.set(p.originX + lat, cy, p.originZ + p.dirZ*rH);
             m.rotation.x = p.dirZ * angle;
         }
@@ -260,69 +308,128 @@ function buildFlightHandrails(p) {
     const fLen  = Math.sqrt(p.riseFt*p.riseFt + p.runFt*p.runFt);
     const angle = Math.atan2(p.riseFt, p.runFt);
     const runsX = Math.abs(p.dirX) > 0.5;
-    [-1,1].forEach(side => {
-        const lat = side * p.stairWidthFt/2;
-        const lx = runsX ? p.originX : p.originX + lat;
+
+    [-1, 1].forEach(side => {
+        const lat = side * p.stairWidthFt / 2;
+        // lat always offsets the axis perpendicular to travel:
+        // runsX flights travel in X => perpendicular is Z => lat goes to Z
+        // runsZ flights travel in Z => perpendicular is X => lat goes to X
+        const lx = runsX ? p.originX       : p.originX + lat;
         const lz = runsX ? p.originZ + lat : p.originZ;
+
         const mkPost = (px, py, pz) => {
             const pm = new THREE.Mesh(new THREE.BoxGeometry(pSz, pH, pSz), mat);
-            pm.position.set(px, py, pz); pm.castShadow = true; p.parentGroup.add(pm);
+            pm.position.set(px, py, pz);
+            pm.castShadow = true;
+            p.parentGroup.add(pm);
         };
+
         const endY = p.startY - p.riseFt;
-        if (runsX) { mkPost(p.originX, p.startY+pH/2, lz); mkPost(p.originX+p.dirX*p.runFt, endY+pH/2, lz); }
-        else       { mkPost(lx, p.startY+pH/2, p.originZ); mkPost(lx, endY+pH/2, p.originZ+p.dirZ*p.runFt); }
+        if (runsX) {
+            mkPost(p.originX,                    p.startY + pH/2, lz);
+            mkPost(p.originX + p.dirX*p.runFt,   endY    + pH/2, lz);
+        } else {
+            mkPost(lx, p.startY + pH/2, p.originZ);
+            mkPost(lx, endY    + pH/2, p.originZ + p.dirZ*p.runFt);
+        }
+
         const midY = p.startY + pH - rH/2 - p.riseFt/2;
         const rg = new THREE.BoxGeometry(rTh, rH, fLen);
-        [midY, midY-(pH-bOff-rH)].forEach(ry => {
+        [midY, midY - (pH - bOff - rH)].forEach(ry => {
             const rail = new THREE.Mesh(rg.clone(), mat);
-            if (runsX) { rail.position.set(p.originX+p.dirX*p.runFt/2, ry, lz); rail.rotation.z=p.dirX*angle; rail.rotation.y=Math.PI/2; }
-            else       { rail.position.set(lx, ry, p.originZ+p.dirZ*p.runFt/2); rail.rotation.x=p.dirZ*angle; }
-            rail.castShadow = true; p.parentGroup.add(rail);
+            if (runsX) {
+                rail.position.set(p.originX + p.dirX*p.runFt/2, ry, lz);
+                rail.rotation.z = p.dirX * angle;
+                rail.rotation.y = Math.PI/2;
+            } else {
+                rail.position.set(lx, ry, p.originZ + p.dirZ*p.runFt/2);
+                rail.rotation.x = p.dirZ * angle;
+            }
+            rail.castShadow = true;
+            p.parentGroup.add(rail);
         });
-        const nb = Math.floor(p.runFt/bSp);
+
+        const nb = Math.floor(p.runFt / bSp);
         const bH = pH - rH - bOff - rH;
-        for (let b=1; b<nb; b++) {
-            const t=b/nb, by=p.startY - t*p.riseFt + bOff + rH + bH/2;
+        for (let b = 1; b < nb; b++) {
+            const t  = b / nb;
+            const by = p.startY - t*p.riseFt + bOff + rH + bH/2;
             const bal = new THREE.Mesh(new THREE.BoxGeometry(bSz, bH, bSz), mat);
-            if (runsX) bal.position.set(p.originX+p.dirX*t*p.runFt, by, lz);
-            else       bal.position.set(lx, by, p.originZ+p.dirZ*t*p.runFt);
-            bal.castShadow = true; p.parentGroup.add(bal);
+            if (runsX) bal.position.set(p.originX + p.dirX*t*p.runFt, by, lz);
+            else       bal.position.set(lx, by, p.originZ + p.dirZ*t*p.runFt);
+            bal.castShadow = true;
+            p.parentGroup.add(bal);
         }
     });
 }
 
 function buildLanding(p) {
-    const bwf=CONFIG.boards.width/12, btf=CONFIG.boards.thickness/12, gf=CONFIG.boards.gap/12;
-    const pw=p.stairWidthFt+p.run2Ft, pd=Math.max(p.landingDepthFt, p.stairWidthFt);
-    const ew=bwf+gf, nr=Math.ceil(pd/ew);
-    const bl=selectOptimalBoardLength(pw);
-    const cx=p.centerZ!==undefined ? p.turnSign*(p.run2Ft/2) : 0;
-    for (let r=0; r<nr; r++) {
-        const zo=-pd/2+r*ew+bwf/2;
-        const m=new THREE.Mesh(new THREE.BoxGeometry(pw,btf,bwf), createBoardMaterial(p.colorConfig,bl,false,`lp_${r}`));
-        m.position.set(cx, p.landingY+btf/2, p.centerZ+zo);
-        m.castShadow=m.receiveShadow=true; p.parentGroup.add(m);
+    const bwf = CONFIG.boards.width/12, btf = CONFIG.boards.thickness/12, gf = CONFIG.boards.gap/12;
+    // Landing width = stair width only; depth = configured landing depth
+    const pw = p.stairWidthFt;
+    const pd = p.landingDepthFt;
+    const ew = bwf + gf;
+    const nr = Math.ceil(pd / ew);
+    const bl = selectOptimalBoardLength(pw);
+
+    for (let r = 0; r < nr; r++) {
+        const zo = -pd/2 + r*ew + bwf/2;
+        const m = new THREE.Mesh(
+            new THREE.BoxGeometry(pw, btf, bwf),
+            createBoardMaterial(p.colorConfig, bl, false, `lp_${r}`)
+        );
+        // Landing boards are centered at X=0, positioned along Z
+        m.position.set(0, p.landingY + btf/2, p.centerZ + zo);
+        m.castShadow = m.receiveShadow = true;
+        p.parentGroup.add(m);
     }
-    if (p.landingY<=0) return;
-    const pm=stringerMat(), pg=new THREE.BoxGeometry(0.33, p.landingY, 0.33);
-    [[-pw/2,-pd/2],[pw/2,-pd/2],[pw/2,pd/2],[-pw/2,pd/2]].forEach(([fx,fz]) => {
-        const post=new THREE.Mesh(pg,pm); post.position.set(cx+fx, p.landingY/2, p.centerZ+fz); post.castShadow=true; p.parentGroup.add(post);
+
+    if (p.landingY <= 0) return;
+    const pm = stringerMat(), pg = new THREE.BoxGeometry(0.33, p.landingY, 0.33);
+    [
+        [-pw/2, -pd/2],
+        [ pw/2, -pd/2],
+        [ pw/2,  pd/2],
+        [-pw/2,  pd/2]
+    ].forEach(([fx, fz]) => {
+        const post = new THREE.Mesh(pg, pm);
+        post.position.set(fx, p.landingY/2, p.centerZ + fz);
+        post.castShadow = true;
+        p.parentGroup.add(post);
     });
 }
 
 function buildLandingRiser(p) {
-    const btf=CONFIG.boards.thickness/12;
-    const bl=selectOptimalBoardLength(p.stairWidthFt);
-    const m=new THREE.Mesh(new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf), createBoardMaterial(p.colorConfig,bl,false,'lr'));
-    m.position.set(0, p.landingY-p.risePerStep/2+btf, p.riserZ);
-    m.castShadow=true; p.parentGroup.add(m);
+    const btf = CONFIG.boards.thickness/12;
+    const bl  = selectOptimalBoardLength(p.stairWidthFt);
+    const m   = new THREE.Mesh(
+        new THREE.BoxGeometry(p.stairWidthFt, p.risePerStep, btf),
+        createBoardMaterial(p.colorConfig, bl, false, 'lr')
+    );
+    m.position.set(0, p.landingY - p.risePerStep/2 + btf, p.riserZ);
+    m.castShadow = true;
+    p.parentGroup.add(m);
 }
 
 function calcLShape(nr, nt, ar, td, dir, ldFt, ls) {
-    const ldf=typeof ldFt==='number' ? ldFt : CONFIG.stairs.landingDepth;
-    const split=typeof ls==='number' ? ls : 0.5;
-    let tbl=Math.max(1, Math.round(nt*split));
-    if (tbl>=nt) tbl=nt-1;
-    const tal=nt-tbl, rbl=tbl+1;
-    return { treadsBeforeLanding:tbl, treadsAfterLanding:tal, risersBeforeLanding:rbl, risersAfterLanding:nr-rbl, landingDepthFeet:ldf, landingDepthInches:ldf*12, run1Feet:(tbl*td)/12, run2Feet:(tal*td)/12, run1Inches:tbl*td, run2Inches:tal*td, heightAtLanding:rbl*ar, turnDirection:dir, landingSplit:split };
+    const ldf   = typeof ldFt === 'number' ? ldFt : CONFIG.stairs.landingDepth;
+    const split = typeof ls   === 'number' ? ls   : 0.5;
+    let tbl = Math.max(1, Math.round(nt * split));
+    if (tbl >= nt) tbl = nt - 1;
+    const tal = nt - tbl, rbl = tbl + 1;
+    return {
+        treadsBeforeLanding:  tbl,
+        treadsAfterLanding:   tal,
+        risersBeforeLanding:  rbl,
+        risersAfterLanding:   nr - rbl,
+        landingDepthFeet:     ldf,
+        landingDepthInches:   ldf * 12,
+        run1Feet:             (tbl * td) / 12,
+        run2Feet:             (tal * td) / 12,
+        run1Inches:           tbl * td,
+        run2Inches:           tal * td,
+        heightAtLanding:      rbl * ar,
+        turnDirection:        dir,
+        landingSplit:         split
+    };
 }
