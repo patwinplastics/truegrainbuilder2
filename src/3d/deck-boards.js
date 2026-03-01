@@ -48,18 +48,14 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 // pts: [[x0,z0],[x1,z1],[x2,z2],[x3,z3]]
 //      [outer-A, outer-B, inner-B, inner-A]
 //
-// swapUV: when true, flips U and V so grain runs 90 degrees differently.
-//   false -> grain runs along world-X  (use for FRONT/BACK boards)
-//   true  -> grain runs along world-Z  (use for LEFT/RIGHT boards)
+// xMin/xMax/zMin/zMax: bounding box of THIS board's vertices.
+//   Each board gets its own bounds so the texture UV spans 0..1
+//   across the board's actual footprint (not the full deck).
 //
-// UV computed from world XZ, normalised to [-L0..L0] x [-W0..W0]:
-//   base_u = (x - xMin) / (xMax - xMin)
-//   base_v = (z - zMin) / (zMax - zMin)
-//   if swapUV: final [u,v] = [base_v, base_u]
-//   else:      final [u,v] = [base_u, base_v]
-//
-// All mitered boards use tex.rotation=0 via boardRunsAlongWidth=true.
-// Grain direction is controlled entirely by swapUV in the geometry.
+// swapUV: controls grain direction by swapping U and V.
+//   Texture grain runs along the V axis (image vertical).
+//   true  -> V maps to normalized X -> grain along X (FRONT/BACK)
+//   false -> V maps to normalized Z -> grain along Z (LEFT/RIGHT)
 // ============================================================
 function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, material) {
     function uv(x, z) {
@@ -110,6 +106,11 @@ function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, mater
 
 // ============================================================
 // Picture frame — precise 45-degree mitered corners
+//
+// Each border board gets UV bounds tight to its own footprint.
+// Grain direction is controlled by swapUV:
+//   FRONT/BACK run along X -> swapUV=true  -> grain along X
+//   LEFT/RIGHT run along Z -> swapUV=false -> grain along Z
 // ============================================================
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
@@ -119,10 +120,6 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const dL = state.deckLength;
     const dW = state.deckWidth;
 
-    // All mitered border boards use boardRunsAlongWidth=true so
-    // tex.rotation=0. Grain direction is handled by swapUV in geometry.
-    // FRONT/BACK run along X -> swapUV=false -> grain along X
-    // LEFT/RIGHT run along Z -> swapUV=true  -> grain along Z
     for (let i = 0; i < bc; i++) {
         const L0 = dL / 2 - i * ew;
         const W0 = dW / 2 - i * ew;
@@ -130,29 +127,31 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         const W1 = W0 - bw;
         const yBot = state.deckHeight;
         const yTop = state.deckHeight + bt;
-        const xMin = -L0, xMax = L0;
-        const zMin = -W0, zMax = W0;
         const mat = createBoardMaterial(bColor, dL, true, `bframe${i}`);
 
-        // FRONT
+        // FRONT: runs along X, narrow in Z
+        // x spans full length (-L0 to L0), z spans one board width (-W0 to -W1)
         deckGroup.add(buildMiteredMesh(
             [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, false, mat
+            yBot, yTop, -L0, L0, -W0, -W1, true, mat
         ));
-        // BACK
+        // BACK: runs along X, narrow in Z
+        // x spans full length (-L0 to L0), z spans one board width (W1 to W0)
         deckGroup.add(buildMiteredMesh(
             [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, false, mat
+            yBot, yTop, -L0, L0, W1, W0, true, mat
         ));
-        // LEFT (perpendicular -> swapUV=true)
+        // LEFT: runs along Z, narrow in X
+        // x spans one board width (-L0 to -L1), z spans full width (-W0 to W0)
         deckGroup.add(buildMiteredMesh(
             [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, true, mat
+            yBot, yTop, -L0, -L1, -W0, W0, false, mat
         ));
-        // RIGHT (perpendicular -> swapUV=true)
+        // RIGHT: runs along Z, narrow in X
+        // x spans one board width (L1 to L0), z spans full width (-W0 to W0)
         deckGroup.add(buildMiteredMesh(
             [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, true, mat
+            yBot, yTop, L1, L0, -W0, W0, false, mat
         ));
     }
 
