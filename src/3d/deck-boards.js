@@ -44,71 +44,84 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 }
 
 // ============================================================
-// Mitered board geometry using ExtrudeGeometry
+// Mitered board geometry
 //
-// Creates a board shape in the XY plane (to be rotated flat):
-//   - Runs along X from -halfLen to +halfLen
-//   - Width bw along Y
-//   - 45-deg cut at start: outer edge shifts by +bw, inner by 0
-//   - 45-deg cut at end:   outer edge shifts by -bw, inner by 0
+// All shapes defined in the XZ plane (top-down), then a flat
+// box is built at the correct Y position.
 //
-//  startMiter / endMiter: +1 = cut toward +Y, -1 = cut toward -Y
+// For a board running along X with its OUTER edge at -Z:
+//   inner edge (at z=0 relative to board center): full length
+//   outer edge (at z=-bw): cut back by bw at both ends
+//
+//   Shape (in local XZ):
+//     (-hl,  0)  →  (+hl,  0)   inner edge, full length
+//     (+hl-bw, -bw)             outer right
+//     (-hl+bw, -bw)             outer left
+//
+// The mesh is centered at the board's world position.
+// outerSign: -1 = outer edge is at -Z (front/back boards)
+//             +1 = outer edge is at +Z (not used; flip via rotation)
 // ============================================================
-function makeMiteredShape(outerLen, bw, startMiter, endMiter) {
-    const hl = outerLen / 2;
+function makeMiteredBoardGeometry(length, bw, bt) {
+    const hl = length / 2;
+
+    // Shape in XZ plane. Outer edge faces -Z (toward outside of deck).
+    // Inner edge at z = 0, outer edge at z = -bw.
+    // Miter: outer corners are inset by bw from each end.
     const shape = new THREE.Shape();
-
-    // Corners going clockwise (outer edge first, then inner)
-    // Outer edge (y = bw side)
-    const x0 = -hl + (startMiter > 0 ? bw : 0);
-    const x1 =  hl - (endMiter   > 0 ? bw : 0);
-    // Inner edge (y = 0 side)
-    const x2 =  hl - (endMiter   < 0 ? -bw : 0);
-    const x3 = -hl + (startMiter < 0 ? -bw : 0);
-
-    shape.moveTo(x0,  bw);
-    shape.lineTo(x1,  bw);
-    shape.lineTo(x2,  0);
-    shape.lineTo(x3,  0);
+    shape.moveTo(-hl,       0);   // inner left
+    shape.lineTo( hl,       0);   // inner right
+    shape.lineTo( hl - bw, -bw);  // outer right
+    shape.lineTo(-hl + bw, -bw);  // outer left
     shape.closePath();
-    return shape;
+
+    // Extrude in Y (will represent board thickness)
+    const geom = new THREE.ExtrudeGeometry(shape, {
+        depth:        bt,
+        bevelEnabled: false
+    });
+
+    // ExtrudeGeometry creates shape in XY plane, extruded along +Z.
+    // We need the shape in XZ and thickness in Y.
+    // Rotate -90deg around X: Y->Z, Z->-Y  (shape goes to XZ plane, extrusion goes down -Y)
+    geom.rotateX(-Math.PI / 2);
+
+    // After rotation: extrusion is along -Y. Translate up by bt so
+    // bottom of board is at y=0 (caller sets position.y = deckHeight).
+    geom.translate(0, bt, 0);
+
+    // The shape outer edge is at z = -bw local space.
+    // We want the board centered on its world Z position, with outer
+    // edge outward. Shift the shape so it's centered: translate +bw/2 in Z.
+    geom.translate(0, 0, bw / 2);
+
+    return geom;
 }
 
-function makeMiteredBoardMesh(outerLen, bw, bt, startMiter, endMiter, material) {
-    const shape = makeMiteredShape(outerLen, bw, startMiter, endMiter);
-    const geom  = new THREE.ExtrudeGeometry(shape, {
-        depth:           bt,
-        bevelEnabled:    false
-    });
-    // ExtrudeGeometry extrudes along Z. Rotate so the board lies flat (XZ plane)
-    // and the extrusion becomes the board thickness (Y axis).
-    geom.rotateX(-Math.PI / 2);
-    // After rotateX the shape's Y becomes -Z and Z becomes Y.
-    // Center the thickness: translate Y by -bt/2 so it sits symmetrically.
-    geom.translate(0, bt / 2, 0);
-    return new THREE.Mesh(geom, material);
+function addMiteredBoard(deckGroup, geom, material, x, y, z, rotY) {
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.set(x, y, z);
+    if (rotY) mesh.rotation.y = rotY;
+    mesh.castShadow = mesh.receiveShadow = true;
+    deckGroup.add(mesh);
 }
 
 // ============================================================
-// Picture frame with 45-degree mitered corners
+// Picture frame — 45-degree mitered corners
 //
-// Convention (viewed from above, boards run along X):
-//   Front board (z = -dW/2 + off): miter start = +1, end = +1
-//     => both ends point toward deck interior (+Z direction)
-//   Back board  (z = +dW/2 - off): miter start = -1, end = -1
-//     => both ends point toward deck interior (-Z direction)
-//   Left board  (x = -dL/2 + off): runs along Z, start = +1, end = -1
-//   Right board (x = +dL/2 - off): runs along Z, start = -1, end = +1
-//
-// The miter offset equals bw so the tip reaches exactly to the
-// outer corner of the deck, flush with the adjacent board's cut.
+// Board geometry has outer edge at -Z in local space.
+// Front board  (outer edge faces -Z world): no rotation needed
+// Back board   (outer edge faces +Z world): rotate Y 180deg
+// Left board   (outer edge faces -X world): rotate Y +90deg
+// Right board  (outer edge faces +X world): rotate Y -90deg
 // ============================================================
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
     const boardY = state.deckHeight;
     const bc     = state.borderWidth;
     const bwFt   = bc * ew;
-    const bColor = state.borderSameColor ? colorConfig : (CONFIG.colors.find(c => c.id === state.borderColor) || colorConfig);
+    const bColor = state.borderSameColor ? colorConfig
+        : (CONFIG.colors.find(c => c.id === state.borderColor) || colorConfig);
     const isLen  = state.boardDirection === 'length';
     const dL = state.deckLength;
     const dW = state.deckWidth;
@@ -116,38 +129,29 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     for (let i = 0; i < bc; i++) {
         const off = i * ew + bw / 2;
 
-        // Front board: along X at z = -dW/2 + off
-        // Miter tips point in +Z (toward deck) at both ends
-        const frontMat = createBoardMaterial(bColor, dL, false, `brd_front_${i}`);
-        const front    = makeMiteredBoardMesh(dL, bw, bt, 1, -1, frontMat);
-        front.position.set(0, boardY, -dW / 2 + off);
-        front.castShadow = front.receiveShadow = true;
-        deckGroup.add(front);
+        // Front board: outer edge faces -Z (front of deck)
+        const fGeom = makeMiteredBoardGeometry(dL, bw, bt);
+        addMiteredBoard(deckGroup, fGeom,
+            createBoardMaterial(bColor, dL, false, `brd_f${i}`),
+            0, boardY, -dW / 2 + off, 0);
 
-        // Back board: along X at z = +dW/2 - off
-        // Miter tips point in -Z (toward deck) at both ends
-        const backMat = createBoardMaterial(bColor, dL, false, `brd_back_${i}`);
-        const back    = makeMiteredBoardMesh(dL, bw, bt, -1, 1, backMat);
-        back.position.set(0, boardY, dW / 2 - off);
-        back.castShadow = back.receiveShadow = true;
-        deckGroup.add(back);
+        // Back board: outer edge faces +Z — rotate 180deg around Y
+        const bkGeom = makeMiteredBoardGeometry(dL, bw, bt);
+        addMiteredBoard(deckGroup, bkGeom,
+            createBoardMaterial(bColor, dL, false, `brd_b${i}`),
+            0, boardY, dW / 2 - off, Math.PI);
 
-        // Left board: along Z at x = -dL/2 + off
-        // Rotate 90deg around Y so it runs along Z
-        const leftMat = createBoardMaterial(bColor, dW, true, `brd_left_${i}`);
-        const left    = makeMiteredBoardMesh(dW, bw, bt, -1, 1, leftMat);
-        left.rotation.y = Math.PI / 2;
-        left.position.set(-dL / 2 + off, boardY, 0);
-        left.castShadow = left.receiveShadow = true;
-        deckGroup.add(left);
+        // Left board: outer edge faces -X — rotate +90deg around Y
+        const lGeom = makeMiteredBoardGeometry(dW, bw, bt);
+        addMiteredBoard(deckGroup, lGeom,
+            createBoardMaterial(bColor, dW, true, `brd_l${i}`),
+            -dL / 2 + off, boardY, 0, Math.PI / 2);
 
-        // Right board: along Z at x = +dL/2 - off
-        const rightMat = createBoardMaterial(bColor, dW, true, `brd_right_${i}`);
-        const right    = makeMiteredBoardMesh(dW, bw, bt, 1, -1, rightMat);
-        right.rotation.y = Math.PI / 2;
-        right.position.set(dL / 2 - off, boardY, 0);
-        right.castShadow = right.receiveShadow = true;
-        deckGroup.add(right);
+        // Right board: outer edge faces +X — rotate -90deg around Y
+        const rGeom = makeMiteredBoardGeometry(dW, bw, bt);
+        addMiteredBoard(deckGroup, rGeom,
+            createBoardMaterial(bColor, dW, true, `brd_r${i}`),
+            dL / 2 - off, boardY, 0, -Math.PI / 2);
     }
 
     // Fill boards: inset by bwFt on all 4 sides
@@ -160,9 +164,7 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         const co  = (r * ew) - cov / 2 + bw / 2;
         const mat = createBoardMaterial(colorConfig, run, !isLen, `pf${r}`);
         const m   = new THREE.Mesh(
-            new THREE.BoxGeometry(isLen ? run : bw, bt, isLen ? bw : run),
-            mat
-        );
+            new THREE.BoxGeometry(isLen ? run : bw, bt, isLen ? bw : run), mat);
         m.position.set(isLen ? 0 : co, boardY + bt / 2, isLen ? co : 0);
         m.castShadow = m.receiveShadow = true;
         deckGroup.add(m);
@@ -176,7 +178,8 @@ function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
     const { bw, bt, g, ew } = dims();
     const boardY  = state.deckHeight + bt/2;
     const isLen   = state.boardDirection === 'length';
-    const bColor  = state.breakerSameColor ? colorConfig : (CONFIG.colors.find(c=>c.id===state.breakerColor)||colorConfig);
+    const bColor  = state.breakerSameColor ? colorConfig
+        : (CONFIG.colors.find(c=>c.id===state.breakerColor)||colorConfig);
     const { runDimension: run, coverDimension: cov, numRows } = state.boardLayout;
     const bp = pattern.breakerPosition || run/2;
     const br = new THREE.Mesh(
