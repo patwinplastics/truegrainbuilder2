@@ -4,7 +4,6 @@
 // ============================================================
 import { CONFIG }               from '../config.js';
 import { createBoardMaterial }  from './materials.js';
-import { selectOptimalBoardLength } from '../calc/optimizer.js';
 
 function dims() {
     const bw = CONFIG.boards.width     / 12;
@@ -44,50 +43,41 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 }
 
 // ============================================================
-// Build a mitered board mesh from 4 absolute XZ corner points.
+// Build a mitered board mesh from 4 absolute world XZ corners.
 //
-// pts:    [[x0,z0],...[x3,z3]]  CCW order top-down
-//         [outer-left, outer-right, inner-right, inner-left]
-// uvOrigin: [ox, oz]  world XZ origin of UV space
-// uAxis:  [dx, dz]  direction of U (along board length)
-// vAxis:  [dx, dz]  direction of V (across board width)
-// uScale: length of board for U normalisation
-// vScale: board width for V normalisation (= bw)
+// pts: [[x0,z0],[x1,z1],[x2,z2],[x3,z3]] in order:
+//      [outer-A, outer-B, inner-B, inner-A]
+//
+// UV convention: SAME for all four border boards.
+//   U = (worldX - xMin) / (xMax - xMin)  mapped over full deck X range
+//   V = (worldZ - zMin) / (zMax - zMin)  mapped over full deck Z range
+//
+// The material's tex.rotation (set by createBoardMaterial) then
+// rotates the grain direction correctly per board orientation:
+//   FRONT/BACK (run along X): boardRunsAlongWidth=false -> tex.rotation=PI/2
+//   LEFT/RIGHT (run along Z): boardRunsAlongWidth=true  -> tex.rotation=0
 // ============================================================
-function buildMiteredMesh(pts, yBot, yTop, uvOrigin, uAxis, vAxis, uScale, vScale, material) {
+function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, material) {
     function uv(x, z) {
-        const dx = x - uvOrigin[0];
-        const dz = z - uvOrigin[1];
-        const u  = (dx * uAxis[0] + dz * uAxis[1]) / uScale;
-        const v  = (dx * vAxis[0] + dz * vAxis[1]) / vScale;
-        return [u, v];
+        return [
+            (x - xMin) / (xMax - xMin),
+            (z - zMin) / (zMax - zMin)
+        ];
     }
 
-    // 8 positions: 0-3 bottom, 4-7 top (same XZ, different Y)
-    const positions = new Float32Array([
-        pts[0][0], yBot, pts[0][1],
-        pts[1][0], yBot, pts[1][1],
-        pts[2][0], yBot, pts[2][1],
-        pts[3][0], yBot, pts[3][1],
-        pts[0][0], yTop, pts[0][1],
-        pts[1][0], yTop, pts[1][1],
-        pts[2][0], yTop, pts[2][1],
-        pts[3][0], yTop, pts[3][1],
-    ]);
-
-    // Precompute UVs per vertex index
-    const uvMap = [
-        uv(pts[0][0], pts[0][1]),  // 0 bottom outer-left
-        uv(pts[1][0], pts[1][1]),  // 1 bottom outer-right
-        uv(pts[2][0], pts[2][1]),  // 2 bottom inner-right
-        uv(pts[3][0], pts[3][1]),  // 3 bottom inner-left
-        uv(pts[0][0], pts[0][1]),  // 4 top outer-left
-        uv(pts[1][0], pts[1][1]),  // 5 top outer-right
-        uv(pts[2][0], pts[2][1]),  // 6 top inner-right
-        uv(pts[3][0], pts[3][1]),  // 7 top inner-left
+    const positions = [
+        [pts[0][0], yBot, pts[0][1]],
+        [pts[1][0], yBot, pts[1][1]],
+        [pts[2][0], yBot, pts[2][1]],
+        [pts[3][0], yBot, pts[3][1]],
+        [pts[0][0], yTop, pts[0][1]],
+        [pts[1][0], yTop, pts[1][1]],
+        [pts[2][0], yTop, pts[2][1]],
+        [pts[3][0], yTop, pts[3][1]],
     ];
 
-    // Triangles: [v0, v1, v2] CCW from outside
+    const uvMap = positions.map(p => uv(p[0], p[2]));
+
     const triangles = [
         [4, 6, 5], [4, 7, 6],   // top
         [0, 1, 2], [0, 2, 3],   // bottom
@@ -101,8 +91,8 @@ function buildMiteredMesh(pts, yBot, yTop, uvOrigin, uAxis, vAxis, uScale, vScal
     const uvArr  = [];
     for (const [a, b, c] of triangles) {
         for (const vi of [a, b, c]) {
-            posArr.push(positions[vi*3], positions[vi*3+1], positions[vi*3+2]);
-            uvArr.push(uvMap[vi][0], uvMap[vi][1]);
+            posArr.push(...positions[vi]);
+            uvArr.push(...uvMap[vi]);
         }
     }
 
@@ -110,7 +100,9 @@ function buildMiteredMesh(pts, yBot, yTop, uvOrigin, uAxis, vAxis, uScale, vScal
     geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArr), 3));
     geom.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(uvArr),  2));
     geom.computeVertexNormals();
-    return new THREE.Mesh(geom, material);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.castShadow = mesh.receiveShadow = true;
+    return mesh;
 }
 
 // ============================================================
@@ -119,10 +111,8 @@ function buildMiteredMesh(pts, yBot, yTop, uvOrigin, uAxis, vAxis, uScale, vScal
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
     const bc     = state.borderWidth;
-    const bwFt   = bc * ew;
     const bColor = state.borderSameColor ? colorConfig
         : (CONFIG.colors.find(c => c.id === state.borderColor) || colorConfig);
-    const isLen = state.boardDirection === 'length';
     const dL = state.deckLength;
     const dW = state.deckWidth;
 
@@ -134,57 +124,49 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         const yBot = state.deckHeight;
         const yTop = state.deckHeight + bt;
 
-        // FRONT: runs along X, outer edge at z = -W0
-        // U = X direction (0..1 over 2*L0), V = Z inward (0..1 over bw)
-        deckGroup.add(Object.assign(
-            buildMiteredMesh(
-                [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
-                yBot, yTop,
-                [-L0, -W0], [1,0], [0,1], 2*L0, bw,
-                createBoardMaterial(bColor, dL, false, `bf${i}`)
-            ), { castShadow: true, receiveShadow: true }
+        // UV bounds span the full outer footprint of this ring
+        const xMin = -L0, xMax = L0;
+        const zMin = -W0, zMax = W0;
+
+        // FRONT: outer at z=-W0, inner at z=-W1, runs along X
+        // boardRunsAlongWidth=false -> tex.rotation=PI/2 -> grain along X
+        deckGroup.add(buildMiteredMesh(
+            [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
+            yBot, yTop, xMin, xMax, zMin, zMax,
+            createBoardMaterial(bColor, dL, false, `bf${i}`)
         ));
 
-        // BACK: runs along X, outer edge at z = +W0
-        // U = X direction, V = -Z inward (0..1 over bw)
-        deckGroup.add(Object.assign(
-            buildMiteredMesh(
-                [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
-                yBot, yTop,
-                [-L0, W0], [1,0], [0,-1], 2*L0, bw,
-                createBoardMaterial(bColor, dL, false, `bb${i}`)
-            ), { castShadow: true, receiveShadow: true }
+        // BACK: outer at z=+W0, inner at z=+W1, runs along X
+        deckGroup.add(buildMiteredMesh(
+            [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
+            yBot, yTop, xMin, xMax, zMin, zMax,
+            createBoardMaterial(bColor, dL, false, `bb${i}`)
         ));
 
-        // LEFT: runs along Z, outer edge at x = -L0
-        // U = Z direction (0..1 over 2*W0), V = X inward (0..1 over bw)
-        deckGroup.add(Object.assign(
-            buildMiteredMesh(
-                [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
-                yBot, yTop,
-                [-L0, -W0], [0,1], [1,0], 2*W0, bw,
-                createBoardMaterial(bColor, dW, true, `bl${i}`)
-            ), { castShadow: true, receiveShadow: true }
+        // LEFT: outer at x=-L0, inner at x=-L1, runs along Z
+        // boardRunsAlongWidth=true -> tex.rotation=0 -> grain along Z
+        deckGroup.add(buildMiteredMesh(
+            [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
+            yBot, yTop, xMin, xMax, zMin, zMax,
+            createBoardMaterial(bColor, dW, true, `bl${i}`)
         ));
 
-        // RIGHT: runs along Z, outer edge at x = +L0
-        // U = Z direction, V = -X inward (0..1 over bw)
-        deckGroup.add(Object.assign(
-            buildMiteredMesh(
-                [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
-                yBot, yTop,
-                [L0, -W0], [0,1], [-1,0], 2*W0, bw,
-                createBoardMaterial(bColor, dW, true, `br${i}`)
-            ), { castShadow: true, receiveShadow: true }
+        // RIGHT: outer at x=+L0, inner at x=+L1, runs along Z
+        deckGroup.add(buildMiteredMesh(
+            [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
+            yBot, yTop, xMin, xMax, zMin, zMax,
+            createBoardMaterial(bColor, dW, true, `br${i}`)
         ));
     }
 
     // Fill boards
-    const iLen  = dL - 2 * bwFt;
-    const iWid  = dW - 2 * bwFt;
-    const run   = isLen ? iLen : iWid;
-    const cov   = isLen ? iWid : iLen;
-    const nRows = Math.ceil(cov / ew);
+    const isLen  = state.boardDirection === 'length';
+    const bwFt   = bc * ew;
+    const iLen   = dL - 2 * bwFt;
+    const iWid   = dW - 2 * bwFt;
+    const run    = isLen ? iLen : iWid;
+    const cov    = isLen ? iWid : iLen;
+    const nRows  = Math.ceil(cov / ew);
     for (let r = 0; r < nRows; r++) {
         const co  = (r * ew) - cov / 2 + bw / 2;
         const mat = createBoardMaterial(colorConfig, run, !isLen, `pf${r}`);
