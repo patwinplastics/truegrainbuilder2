@@ -1,6 +1,6 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Stair 3D Geometry
-// v4.1 — flight 2 origin aligned to landing center + side edge
+// v4.2 — landing platform railings on open edges
 // ============================================================
 import { CONFIG }              from '../config.js';
 import { state }               from '../state.js';
@@ -14,6 +14,16 @@ const ST = {
 };
 const BOARD_TH    = CONFIG.boards.thickness / 12;
 const EDGE_OFFSET = BOARD_TH;
+
+// Shared handrail dimensions (used by flights + landing)
+const RAIL = {
+    H:       3,       // height above surface (ft)
+    BOT:     0.33,    // bottom rail height above surface (ft)
+    POST_SZ: 0.29,    // post cross-section (ft)
+    TH:      0.15,    // rail bar thickness (ft)
+    BAL_SZ:  0.10,    // baluster cross-section (ft)
+    BAL_SP:  0.33     // baluster spacing (ft)
+};
 
 // ============================================================
 // PT lumber texture
@@ -100,6 +110,43 @@ function makeBar(parent, mat, x1, y1, z1, x2, y2, z2, thickness) {
     mesh.lookAt(x2, y2, z2);
     mesh.castShadow = true;
     parent.add(mesh);
+}
+
+// Build a horizontal railing segment between two XZ points at a given Y
+function buildRailingSegment(parent, mat, x1, z1, x2, z2, surfY) {
+    const edgeLen = Math.sqrt((x2-x1)**2 + (z2-z1)**2);
+    if (edgeLen < 0.01) return;
+
+    // Posts at each end
+    addBox(parent, mat, RAIL.POST_SZ, RAIL.H, RAIL.POST_SZ,
+           x1, surfY + RAIL.H / 2, z1);
+    addBox(parent, mat, RAIL.POST_SZ, RAIL.H, RAIL.POST_SZ,
+           x2, surfY + RAIL.H / 2, z2);
+
+    // Top rail
+    makeBar(parent, mat,
+        x1, surfY + RAIL.H, z1,
+        x2, surfY + RAIL.H, z2,
+        RAIL.TH
+    );
+
+    // Bottom rail
+    makeBar(parent, mat,
+        x1, surfY + RAIL.BOT, z1,
+        x2, surfY + RAIL.BOT, z2,
+        RAIL.TH
+    );
+
+    // Balusters
+    const balH = RAIL.H - RAIL.BOT;
+    const nBal = Math.max(1, Math.floor(edgeLen / RAIL.BAL_SP));
+    for (let b = 1; b < nBal; b++) {
+        const t = b / nBal;
+        const bx = x1 + (x2 - x1) * t;
+        const bz = z1 + (z2 - z1) * t;
+        const balYc = surfY + RAIL.BOT + balH / 2;
+        addBox(parent, mat, RAIL.BAL_SZ, balH, RAIL.BAL_SZ, bx, balYc, bz);
+    }
 }
 
 // ============================================================
@@ -209,17 +256,20 @@ function buildStraightStair(sc, dims, g, cc, st) {
 // ============================================================
 // L-Shaped stair
 //
-//  Coordinate model (local group space, before positionStairGroup):
-//    Origin (0,0,0) = deck edge attachment point at deck surface Y
-//    Flight 1: travels in -Z from origin
-//    Landing:  square pad sw x sw
-//       near edge Z = -run1Feet
-//       far  edge Z = -(run1Feet + sw)
-//       center    Z = -(run1Feet + sw/2)
-//       spans X from -sw/2 to +sw/2
-//    Flight 2: exits from side edge of landing, travels in sign*X
-//       originX = sign * sw/2   (side edge)
-//       originZ = landing center Z  (treads centered on landing)
+//  Coordinate model (local group space):
+//    Origin (0,0,0) = deck edge attachment
+//    Flight 1: -Z
+//    Landing:  sw x sw pad
+//       near edge Z = -run1    (flight 1 arrives)
+//       far  edge Z = -(run1 + sw)
+//       center    Z = -(run1 + sw/2)
+//       X from -sw/2 to +sw/2
+//    Flight 2: exits side edge sign*sw/2, runs sign*X
+//
+//  Landing railing edges (open sides):
+//    1. Far edge  (always open)
+//    2. Side opposite turn direction (-sign * sw/2)
+//    Near edge: flight 1 connects. Turn-side edge: flight 2 exits.
 // ============================================================
 function buildLShapedStair(sc, dims, g, cc, st) {
     const ld   = dims.lShapedData;
@@ -261,8 +311,6 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     });
 
     // Flight 2: exits from side edge of landing, runs in sign*X
-    //   originX = side edge of landing (sign * sw/2)
-    //   originZ = center of landing in Z (treads span sw in Z, centered here)
     const f2originX = sign * sw / 2;
     const f2originZ = landingCenterZ;
     buildFlightTreads({
@@ -280,17 +328,24 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     });
 
     if (sc.includeHandrails) {
+        // Flight 1 handrails
         buildFlightHandrails({
             parentGroup: g, stairWidthFt: sw,
             riseFt: rise1, runFt: ld.run1Feet,
             startY: st.deckHeight, originX: 0, originZ: 0,
             dirZ: -1, dirX: 0
         });
+        // Flight 2 handrails
         buildFlightHandrails({
             parentGroup: g, stairWidthFt: sw,
             riseFt: rise2, runFt: ld.run2Feet,
             startY: landingY, originX: f2originX, originZ: f2originZ,
             dirZ: 0, dirX: sign
+        });
+        // Landing platform railings (open edges)
+        buildLandingRailings({
+            parentGroup: g, landingY, sw,
+            run1Feet: ld.run1Feet, sign
         });
     }
 }
@@ -396,15 +451,9 @@ function buildFlightStringers(p) {
 // buildFlightHandrails (v4)
 // ============================================================
 function buildFlightHandrails(p) {
-    const mat = handrailMat();
-    const RAIL_H   = 3;
-    const BOT_RAIL = 0.33;
-    const POST_SZ  = 0.29;
-    const RAIL_TH  = 0.15;
-    const BAL_SZ   = 0.10;
-    const BAL_SP   = 0.33;
-    const runsX    = Math.abs(p.dirX) > 0.5;
-    const endY     = p.startY - p.riseFt;
+    const mat  = handrailMat();
+    const runsX = Math.abs(p.dirX) > 0.5;
+    const endY  = p.startY - p.riseFt;
 
     [-1, 1].forEach(side => {
         const lat = side * p.stairWidthFt / 2;
@@ -419,37 +468,64 @@ function buildFlightHandrails(p) {
         }
 
         // Posts
-        addBox(p.parentGroup, mat, POST_SZ, RAIL_H, POST_SZ,
-               topX, p.startY + RAIL_H / 2, topZ);
-        addBox(p.parentGroup, mat, POST_SZ, RAIL_H, POST_SZ,
-               botX, endY + RAIL_H / 2, botZ);
+        addBox(p.parentGroup, mat, RAIL.POST_SZ, RAIL.H, RAIL.POST_SZ,
+               topX, p.startY + RAIL.H / 2, topZ);
+        addBox(p.parentGroup, mat, RAIL.POST_SZ, RAIL.H, RAIL.POST_SZ,
+               botX, endY + RAIL.H / 2, botZ);
 
-        // Top rail
+        // Top rail (diagonal)
         makeBar(p.parentGroup, mat,
-            topX, p.startY + RAIL_H, topZ,
-            botX, endY     + RAIL_H, botZ,
-            RAIL_TH
+            topX, p.startY + RAIL.H, topZ,
+            botX, endY     + RAIL.H, botZ,
+            RAIL.TH
         );
 
-        // Bottom rail
+        // Bottom rail (diagonal)
         makeBar(p.parentGroup, mat,
-            topX, p.startY + BOT_RAIL, topZ,
-            botX, endY     + BOT_RAIL, botZ,
-            RAIL_TH
+            topX, p.startY + RAIL.BOT, topZ,
+            botX, endY     + RAIL.BOT, botZ,
+            RAIL.TH
         );
 
-        // Balusters
-        const balH  = RAIL_H - BOT_RAIL;
-        const nBal  = Math.max(1, Math.floor(p.runFt / BAL_SP));
+        // Balusters (constant height, vertical)
+        const balH  = RAIL.H - RAIL.BOT;
+        const nBal  = Math.max(1, Math.floor(p.runFt / RAIL.BAL_SP));
         for (let b = 1; b < nBal; b++) {
             const t = b / nBal;
             const bx = topX + (botX - topX) * t;
             const bz = topZ + (botZ - topZ) * t;
             const surfY = p.startY - t * p.riseFt;
-            const balYc = surfY + BOT_RAIL + balH / 2;
-            addBox(p.parentGroup, mat, BAL_SZ, balH, BAL_SZ, bx, balYc, bz);
+            const balYc = surfY + RAIL.BOT + balH / 2;
+            addBox(p.parentGroup, mat, RAIL.BAL_SZ, balH, RAIL.BAL_SZ, bx, balYc, bz);
         }
     });
+}
+
+// ============================================================
+// buildLandingRailings
+//
+// Adds horizontal railings to the two open edges of the landing:
+//   1. Far edge (Z = -(run1 + sw))  -- always open
+//   2. Opposite-turn side (X = -sign * sw/2) -- always open
+//
+// The other two edges connect to flights:
+//   - Near edge (Z = -run1) connects to flight 1
+//   - Turn-side edge (X = sign * sw/2) connects to flight 2
+// ============================================================
+function buildLandingRailings(p) {
+    const mat  = handrailMat();
+    const half = p.sw / 2;
+    const nearZ = -p.run1Feet;
+    const farZ  = -(p.run1Feet + p.sw);
+    const oppX  = -p.sign * half;
+
+    // Edge 1: far edge (runs along X from -sw/2 to +sw/2 at farZ)
+    buildRailingSegment(p.parentGroup, mat,
+        -half, farZ,  half, farZ,  p.landingY);
+
+    // Edge 2: opposite-turn side (runs along Z from nearZ to farZ at oppX)
+    buildRailingSegment(p.parentGroup, mat,
+        oppX, nearZ,  oppX, farZ,  p.landingY);
 }
 
 // ============================================================
