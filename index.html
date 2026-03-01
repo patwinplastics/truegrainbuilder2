@@ -10,157 +10,82 @@
     <link rel="stylesheet" href="main.css">
     <link rel="stylesheet" href="stair-styles.css">
     <style>
-        /* Wizard step visibility */
         .wizard-step        { display: none; }
         .wizard-step.active { display: block; }
-
-        /* ============================================================
-           Walk the Deck button
-        ============================================================ */
         #walkBtn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            background: #1a6e3c;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 7px 14px;
-            font-size: 13px;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            transition: background 0.2s;
+            display: flex; align-items: center; gap: 6px;
+            background: #1a6e3c; color: #fff; border: none; border-radius: 8px;
+            padding: 7px 14px; font-size: 13px; font-weight: 600;
+            font-family: inherit; cursor: pointer; transition: background 0.2s;
             white-space: nowrap;
         }
         #walkBtn:hover { background: #145c31; }
         #walkBtn svg   { width: 16px; height: 16px; flex-shrink: 0; }
-
-        /* ============================================================
-           Walkthrough HUD — desktop
-        ============================================================ */
         #walkthroughHUD {
-            position: fixed;
-            bottom: 28px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999;
-            pointer-events: none;
-            transition: opacity 0.3s;
+            position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; pointer-events: none; transition: opacity 0.3s;
         }
         #walkthroughHUD.wt-hud--hidden { opacity: 0; }
-
         .wt-hud__inner {
-            background: rgba(0,0,0,0.68);
-            backdrop-filter: blur(8px);
-            border-radius: 20px;
-            padding: 10px 22px 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            min-width: 340px;
-            pointer-events: none;
+            background: rgba(0,0,0,0.68); backdrop-filter: blur(8px);
+            border-radius: 20px; padding: 10px 22px 8px;
+            display: flex; flex-direction: column; align-items: center;
+            gap: 6px; min-width: 340px; pointer-events: none;
         }
-        /* Touch variant — buttons need pointer events */
         .wt-hud__inner--touch { pointer-events: auto; }
-
-        .wt-hud__keys-row {
-            width: 100%;
-            text-align: center;
-        }
+        .wt-hud__keys-row { width: 100%; text-align: center; }
         .wt-hud__keys {
-            color: rgba(255,255,255,0.65);
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            letter-spacing: 0.2px;
+            color: rgba(255,255,255,0.65); font-family: 'Inter', sans-serif;
+            font-size: 12px; font-weight: 500; letter-spacing: 0.2px;
         }
         .wt-hud__crouch-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 5px;
-            width: 100%;
+            display: flex; align-items: center; justify-content: center;
+            gap: 12px; border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 5px; width: 100%;
         }
         .wt-hud__crouch-label {
-            color: rgba(255,255,255,0.55);
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            transition: color 0.2s;
+            color: rgba(255,255,255,0.55); font-family: 'Inter', sans-serif;
+            font-size: 12px; font-weight: 500; transition: color 0.2s;
         }
-        .wt-hud__crouch-label--active {
-            color: #2ecc71;
-            font-weight: 700;
-        }
-
-        /* Touch HUD buttons */
-        .wt-hud__crouch-btn,
-        .wt-hud__exit-btn {
-            border: none;
-            border-radius: 8px;
-            padding: 6px 14px;
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            touch-action: manipulation;
+        .wt-hud__crouch-label--active { color: #2ecc71; font-weight: 700; }
+        .wt-hud__crouch-btn, .wt-hud__exit-btn {
+            border: none; border-radius: 8px; padding: 6px 14px;
+            font-family: 'Inter', sans-serif; font-size: 13px;
+            font-weight: 600; cursor: pointer; touch-action: manipulation;
         }
         .wt-hud__crouch-btn {
-            background: rgba(46,204,113,0.25);
-            color: #2ecc71;
+            background: rgba(46,204,113,0.25); color: #2ecc71;
             border: 1px solid rgba(46,204,113,0.5);
         }
-        .wt-hud__exit-btn {
-            background: rgba(255,255,255,0.12);
-            color: #fff;
-        }
-
-        /* ============================================================
-           Virtual joystick
-        ============================================================ */
+        .wt-hud__exit-btn { background: rgba(255,255,255,0.12); color: #fff; }
         #wtJoystick {
-            position: fixed;
-            left: 0;
-            bottom: 0;
-            width: 35vw;     /* left 35% of screen is joystick zone */
-            height: 100%;
-            z-index: 9998;
-            pointer-events: none; /* touches handled on canvas directly */
+            position: fixed; left: 0; bottom: 0; width: 35vw; height: 100%;
+            z-index: 9998; pointer-events: none;
         }
         #wtJsBase {
-            position: absolute;
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.08);
-            border: 2px solid rgba(255,255,255,0.22);
-            /* default resting position — overridden by JS on touch */
-            bottom: 40px;
-            left: 40px;
-            pointer-events: none;
+            position: absolute; width: 110px; height: 110px; border-radius: 50%;
+            background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.22);
+            bottom: 40px; left: 40px; pointer-events: none;
         }
         #wtJsKnob {
-            position: absolute;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: rgba(46,204,113,0.75);
-            box-shadow: 0 0 10px rgba(46,204,113,0.5);
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            transition: transform 0.05s linear;
+            position: absolute; width: 44px; height: 44px; border-radius: 50%;
+            background: rgba(46,204,113,0.75); box-shadow: 0 0 10px rgba(46,204,113,0.5);
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            pointer-events: none; transition: transform 0.05s linear;
         }
+        /* Landing step input */
+        .landing-step-group { margin-top: 12px; }
+        .landing-step-row { display: flex; align-items: center; gap: 8px; }
+        .landing-step-row input[type=number] {
+            width: 64px; padding: 6px 8px; border: 1px solid #ccc;
+            border-radius: 6px; font-size: 14px; font-family: inherit;
+        }
+        .landing-step-hint { font-size: 0.78em; color: #888; margin-top: 4px; }
+        .landing-step-display { font-size: 0.8em; color: #555; margin-top: 4px; min-height: 1.2em; }
     </style>
 </head>
 <body>
     <div class="deck-designer">
-        <!-- Header -->
         <header class="header">
             <div class="header__logo">
                 <img src="images/truegrain-logo.png" alt="TrueGrain" class="header__logo-image" onerror="this.style.display='none'">
@@ -175,9 +100,7 @@
         </header>
 
         <main class="main">
-            <!-- Wizard Panel -->
             <aside class="wizard-panel">
-                <!-- Progress Navigation -->
                 <nav class="progress-nav">
                     <div class="progress-step active" data-step="1"><span class="progress-step__number">1</span><span class="progress-step__label">Size</span></div>
                     <div class="progress-step" data-step="2"><span class="progress-step__number">2</span><span class="progress-step__label">Structure</span></div>
@@ -350,6 +273,8 @@
                                         <label class="radio-card radio-card--small"><input type="radio" name="stairShape" value="l-shape"><span>L-Shape</span></label>
                                     </div>
                                 </div>
+
+                                <!-- L-Shape options -->
                                 <div class="l-shape-options hidden" id="lShapeOptions">
                                     <div class="form-group">
                                         <label class="form-label">Turn Direction</label>
@@ -358,33 +283,28 @@
                                             <label class="radio-card radio-card--small selected"><input type="radio" name="stairTurnDirection" value="right" checked><span>Turn Right</span></label>
                                         </div>
                                     </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Landing Depth (feet)</label>
-                                        <div class="slider-input">
-                                            <input type="range" id="landingDepthSlider" class="slider" min="3" max="6" value="3" step="0.5">
-                                            <input type="number" id="landingDepthInput" class="number-input" min="3" max="6" value="3" step="0.5">
-                                            <span class="unit">ft</span>
+
+                                    <!-- Landing Position: step number input -->
+                                    <div class="form-group landing-step-group">
+                                        <label class="form-label" for="landingStepInput">Landing after riser #</label>
+                                        <div class="landing-step-row">
+                                            <input type="number" id="landingStepInput" min="1" step="1" placeholder="auto">
+                                            <span class="landing-step-hint" id="landingStepRange"></span>
                                         </div>
-                                        <p class="form-hint">Minimum 3 ft per IRC R311.7.6.</p>
+                                        <div class="landing-step-display" id="landingStepDisplay"></div>
+                                        <p class="form-hint">Enter which riser the landing falls after. Leave blank for automatic midpoint.</p>
                                     </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Landing Position</label>
-                                        <div class="slider-input">
-                                            <input type="range" id="landingSplitSlider" class="slider" min="25" max="75" value="50" step="5">
-                                            <input type="number" id="landingSplitInput" class="number-input" min="25" max="75" value="50">
-                                            <span class="unit">%</span>
-                                        </div>
-                                        <p class="form-hint">50% = landing halfway up.</p>
-                                    </div>
+
                                     <div class="stair-info-card" id="lShapeInfoCard">
-                                        <div class="stair-info-header">L-Shape Dimensions</div>
-                                        <div class="stair-info-row"><span class="stair-info-label">Lower Run Steps:</span><span class="stair-info-value" id="lShapeLowerSteps">2</span></div>
-                                        <div class="stair-info-row"><span class="stair-info-label">Upper Run Steps:</span><span class="stair-info-value" id="lShapeUpperSteps">2</span></div>
+                                        <div class="stair-info-header">L-SHAPE DIMENSIONS</div>
+                                        <div class="stair-info-row"><span class="stair-info-label">Lower Flight Steps:</span><span class="stair-info-value" id="lShapeLowerSteps">2</span></div>
+                                        <div class="stair-info-row"><span class="stair-info-label">Upper Flight Steps:</span><span class="stair-info-value" id="lShapeUpperSteps">2</span></div>
                                         <div class="stair-info-row"><span class="stair-info-label">Landing Height:</span><span class="stair-info-value" id="lShapeLandingHeight">1 ft</span></div>
                                         <div class="stair-info-row"><span class="stair-info-label">Lower Run:</span><span class="stair-info-value" id="lShapeLowerRun">1.75 ft</span></div>
                                         <div class="stair-info-row"><span class="stair-info-label">Upper Run:</span><span class="stair-info-value" id="lShapeUpperRun">1.75 ft</span></div>
                                     </div>
                                 </div>
+
                                 <div class="form-group">
                                     <div class="checkbox-toggle"><input type="checkbox" id="stairHandrails" checked><label for="stairHandrails">Include handrails on stairs</label></div>
                                 </div>
@@ -470,7 +390,6 @@
                 </div>
             </aside>
 
-            <!-- Visualization Panel -->
             <section class="visualization-panel">
                 <div class="view-controls">
                     <button class="view-btn selected" id="view3D" data-view="3d">3D View</button>
@@ -505,7 +424,6 @@
         </main>
     </div>
 
-    <!-- Success Modal -->
     <div class="modal hidden" id="successModal" role="dialog" aria-modal="true">
         <div class="modal__overlay" data-close-modal></div>
         <div class="modal__content">
@@ -515,7 +433,6 @@
         </div>
     </div>
 
-    <!-- CDN dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>

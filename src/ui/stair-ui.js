@@ -25,7 +25,7 @@ export function addStair(edge) {
         shape: 'straight',
         turnDirection: 'right',
         includeHandrails: true,
-        landingStepNumber: null   // null = auto (midpoint)
+        landingStepNumber: null   // null = auto midpoint
     };
     updateState({ stairs: [...state.stairs, stair], stairsEnabled: true, selectedStairId: stair.id });
     return stair;
@@ -89,16 +89,16 @@ function renderStairList(st) {
 }
 
 // ============================================================
-// Info card refresh
+// Info cards
 // ============================================================
 function refreshInfoCards(stair) {
     if (!stair) return;
     const dims = calculateStairDimensions(stair, state);
     if (!dims) return;
-    setText('stairStepCount',   dims.numTreads);
-    setText('stairTotalRun',    dims.totalRunFeet.toFixed(1) + ' ft');
-    setText('stairRisePerStep', dims.actualRise.toFixed(1) + '"');
-    setText('treadDepthDisplay',dims.treadDepth.toFixed(1) + '"');
+    setText('stairStepCount',    dims.numTreads);
+    setText('stairTotalRun',     dims.totalRunFeet.toFixed(1) + ' ft');
+    setText('stairRisePerStep',  dims.actualRise.toFixed(1) + '"');
+    setText('treadDepthDisplay', dims.treadDepth.toFixed(1) + '"');
 
     if (stair.shape === 'l-shaped' && dims.lShapedData) {
         const ld = dims.lShapedData;
@@ -108,15 +108,11 @@ function refreshInfoCards(stair) {
         setText('lShapeLowerRun',      ld.run1Feet.toFixed(1) + ' ft');
         setText('lShapeUpperRun',      ld.run2Feet.toFixed(1) + ' ft');
 
-        // Update landing step input bounds dynamically
-        const lsInput = document.getElementById('landingStepInput');
-        if (lsInput) {
-            lsInput.min = 1;
-            lsInput.max = dims.numRisers - 1;
-            // Show placeholder with current actual value
-            lsInput.placeholder = `1–${dims.numRisers - 1} (auto: ${ld.landingStepNumber})`;
-        }
-        setText('landingStepDisplay', `After step ${ld.treadsBeforeLanding} of ${dims.numTreads} (${ld.treadsAfterLanding} steps remain)`);
+        // Update range label and display
+        setText('landingStepRange', `(1 to ${dims.numRisers - 1})`);
+        setText('landingStepDisplay',
+            `Landing after riser ${ld.landingStepNumber}: ` +
+            `${ld.treadsBeforeLanding} steps down, then ${ld.treadsAfterLanding} steps sideways`);
     }
 }
 
@@ -126,7 +122,6 @@ function refreshInfoCards(stair) {
 function populateControls(stair) {
     if (!stair) return;
 
-    // Shape radios
     const htmlShape = SHAPE_TO_HTML[stair.shape] || 'straight';
     document.querySelectorAll('input[name="stairShape"]').forEach(r => {
         r.checked = r.value === htmlShape;
@@ -134,31 +129,25 @@ function populateControls(stair) {
     });
     document.getElementById('lShapeOptions')?.classList.toggle('hidden', stair.shape !== 'l-shaped');
 
-    // Turn direction
     document.querySelectorAll('input[name="stairTurnDirection"]').forEach(r => {
         r.checked = r.value === (stair.turnDirection || 'right');
         r.closest('.radio-card')?.classList.toggle('selected', r.checked);
     });
 
-    // Boards per tread
     document.querySelectorAll('input[name="boardsPerTread"]').forEach(r => {
         r.checked = +r.value === (stair.boardsPerTread || CONFIG.stairs.boardsPerTread.default);
         r.closest('.radio-card')?.classList.toggle('selected', r.checked);
     });
 
-    // Stair width
     setVal('stairWidthSlider', stair.width || CONFIG.stairs.defaultWidth);
     setVal('stairWidthInput',  stair.width || CONFIG.stairs.defaultWidth);
 
-    // Handrails
     const hr = document.getElementById('stairHandrails');
     if (hr) hr.checked = stair.includeHandrails !== false;
 
-    // Landing step number (clear if null = auto)
+    // Landing step input
     const lsInput = document.getElementById('landingStepInput');
-    if (lsInput) {
-        lsInput.value = stair.landingStepNumber != null ? stair.landingStepNumber : '';
-    }
+    if (lsInput) lsInput.value = stair.landingStepNumber != null ? stair.landingStepNumber : '';
 
     refreshInfoCards(stair);
 }
@@ -174,11 +163,11 @@ export function initStairUI() {
             e.preventDefault(); e.stopPropagation();
             const edge = this.dataset.edge;
             if (edge) addStair(edge);
-            else console.error('Stair edge button missing data-edge:', this);
+            else console.error('Missing data-edge on stair button:', this);
         });
     });
 
-    // Remove / select stair (delegated)
+    // Remove / select stair
     document.getElementById('stairList')?.addEventListener('click', e => {
         const removeBtn = e.target.closest('[data-remove-stair]');
         if (removeBtn) { e.stopPropagation(); removeStair(removeBtn.dataset.removeStair); return; }
@@ -186,7 +175,7 @@ export function initStairUI() {
         if (item) updateState({ selectedStairId: item.dataset.selectStair });
     });
 
-    // Delete stair
+    // Delete stair button
     document.getElementById('deleteStairBtn')?.addEventListener('click', () => {
         const stair = getSelected();
         if (stair && confirm('Remove this stair?')) removeStair(stair.id);
@@ -248,45 +237,43 @@ export function initStairUI() {
         if (stair) updateStair(stair.id, { includeHandrails: e.target.checked });
     });
 
-    // ---- Landing Step Number input ----
-    // User types which step number the landing occurs after (1 = after 1st riser).
-    // Empty = auto (midpoint). Bounds enforced on blur/change.
+    // ---- Landing Step Number ----
+    // Typing a number sets the riser after which the landing falls.
+    // Clearing the field resets to auto (midpoint).
     const lsInput = document.getElementById('landingStepInput');
     if (lsInput) {
-        lsInput.addEventListener('input', e => {
-            const raw = e.target.value.trim();
-            if (raw === '') {
-                // Auto mode
-                const stair = getSelected();
-                if (stair) { updateStair(stair.id, { landingStepNumber: null }); refreshInfoCards(getSelected()); }
-                return;
-            }
-            const v = parseInt(raw, 10);
-            if (isNaN(v)) return;
+        const applyLandingStep = (raw) => {
             const stair = getSelected();
             if (!stair) return;
+            if (raw === '' || raw == null) {
+                updateStair(stair.id, { landingStepNumber: null });
+                refreshInfoCards(getSelected());
+                return;
+            }
+            const v    = parseInt(raw, 10);
+            if (isNaN(v)) return;
             const dims = calculateStairDimensions(stair, state);
             if (!dims) return;
             const clamped = Math.max(1, Math.min(dims.numRisers - 1, v));
             updateStair(stair.id, { landingStepNumber: clamped });
             refreshInfoCards(getSelected());
-        });
-        lsInput.addEventListener('blur', e => {
-            const raw = e.target.value.trim();
-            if (raw === '') return;
-            const v = parseInt(raw, 10);
+        };
+
+        lsInput.addEventListener('input',  e => applyLandingStep(e.target.value.trim()));
+        lsInput.addEventListener('blur',   e => {
             const stair = getSelected();
-            if (!stair || isNaN(v)) { e.target.value = ''; return; }
+            if (!stair) return;
+            const raw = e.target.value.trim();
+            if (raw === '') { lsInput.value = ''; applyLandingStep(''); return; }
             const dims = calculateStairDimensions(stair, state);
             if (!dims) return;
-            const clamped = Math.max(1, Math.min(dims.numRisers - 1, v));
-            e.target.value = clamped;
-            updateStair(stair.id, { landingStepNumber: clamped });
-            refreshInfoCards(getSelected());
+            const clamped = Math.max(1, Math.min(dims.numRisers - 1, parseInt(raw, 10) || 1));
+            lsInput.value = clamped;
+            applyLandingStep(String(clamped));
         });
     }
 
-    // Subscribe
+    // Subscribe to state changes
     let lastSelectedId = state.selectedStairId;
     subscribe(() => {
         renderStairList(state);
