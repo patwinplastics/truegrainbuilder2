@@ -2,14 +2,9 @@
  * TrueGrain Board Profile Geometry
  * Cross-section parsed from: Grooved-Chestnut-Decking-Wrapped.DXF
  *
- * Geometry strategy: manual BufferGeometry sweep.
- *   profile X  -> world X  (board width, centered at 0)
- *   profile Y  -> world Y  (depth, 0 = top surface, negative = downward)
- * Swept along world Z (board length).
- *
- * Place mesh at:  mesh.position.y = state.deckHeight + BOARD_PROFILE.thicknessFt
- * For X-running:  mesh.rotation.y = Math.PI / 2
- * For Z-running:  no rotation needed
+ * Geometry uses two material groups:
+ *   group 0 — side wall quads (textured, createBoardMaterial)
+ *   group 1 — end caps       (solid color, createCapMaterial)
  *
  * THREE is a global loaded via CDN <script> tag in index.html.
  *
@@ -29,8 +24,7 @@ export const BOARD_PROFILE = {
 export const BOARD_GAP_FT   = 0.125 * IN;
 export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
 
-// Profile points in inches.
-// X = board width (centered at 0), Y = 0 at top, negative downward.
+// Profile points (inches): X = board width, Y = 0 at top surface, negative downward.
 // Points trace CW when viewed from the near end (-Z direction).
 const PROFILE_IN = [
   [-2.65,         0           ],
@@ -118,7 +112,6 @@ export function createBoardGeometry(lengthFt) {
   const zN = -lengthFt / 2;
   const zF =  lengthFt / 2;
 
-  // Positions: indices 0..N-1 = near ring (zN), N..2N-1 = far ring (zF)
   const positions = new Float32Array(N * 2 * 3);
   for (let i = 0; i < N; i++) {
     const [x, y] = PROFILE_FT[i];
@@ -126,7 +119,6 @@ export function createBoardGeometry(lengthFt) {
     positions[(N + i) * 3]   = x;  positions[(N + i) * 3 + 1]   = y;  positions[(N + i) * 3 + 2]   = zF;
   }
 
-  // UVs: U = x across width (0..1), V = 0 at near end, 1 at far end
   const uvs = new Float32Array(N * 2 * 2);
   for (let i = 0; i < N; i++) {
     const u = (PROFILE_FT[i][0] + HALF_W) / BOARD_PROFILE.widthFt;
@@ -134,29 +126,38 @@ export function createBoardGeometry(lengthFt) {
     uvs[(N+i) * 2]   = u;  uvs[(N+i) * 2 + 1]   = 1;
   }
 
-  const indices = [];
+  const sideIndices = [];
+  const capIndices  = [];
 
-  // End caps — fan from vertex 0
-  // Profile traces CW from -Z viewpoint, so near cap uses same order (front-facing -Z)
-  // Far cap reverses winding so it faces +Z
+  // End caps — group 1 (solid color material)
+  // Profile is CW from -Z, so near cap = same order, far cap = reversed
   for (let i = 1; i < N - 1; i++) {
-    indices.push(0,     i,     i + 1);      // near cap: faces -Z
-    indices.push(N, N + i + 1, N + i);      // far  cap: faces +Z (reversed)
+    capIndices.push(0,     i,     i + 1);      // near cap: faces -Z
+    capIndices.push(N, N + i + 1, N + i);      // far  cap: faces +Z
   }
 
-  // Side wall quads — one per profile edge, connecting near ring to far ring
+  // Side wall quads — group 0 (textured material)
   for (let i = 0; i < N; i++) {
     const j  = (i + 1) % N;
     const ni = i,     nj = j;
     const fi = N + i, fj = N + j;
-    indices.push(ni, fi, fj);
-    indices.push(ni, fj, nj);
+    sideIndices.push(ni, fi, fj);
+    sideIndices.push(ni, fj, nj);
   }
+
+  // Merge into single index buffer with groups
+  const allIndices = [...sideIndices, ...capIndices];
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2));
-  geo.setIndex(indices);
+  geo.setIndex(allIndices);
+
+  // group 0 = side walls (material index 0 = textured)
+  geo.addGroup(0,                    sideIndices.length, 0);
+  // group 1 = end caps  (material index 1 = solid color)
+  geo.addGroup(sideIndices.length,   capIndices.length,  1);
+
   geo.computeVertexNormals();
   return geo;
 }
