@@ -4,7 +4,6 @@
 // ============================================================
 import { CONFIG } from '../config.js';
 import { selectOptimalBoardLength } from './optimizer.js';
-import { calculateStairDimensions } from '../3d/stairs-3d.js';
 
 export function calculateAll(state) {
     const pattern  = determinePattern(state);
@@ -93,8 +92,46 @@ function calculateHardware(state) {
 }
 
 // ============================================================
-// Stair material calculations
+// Stair dimension calculation (inlined to avoid circular deps)
 // ============================================================
+function calcStairDims(sc, st) {
+    const hi = st.deckHeight * 12;
+    const tgt = CONFIG.stairs.riserHeight.target;
+    let nr = Math.max(1, Math.round(hi / tgt));
+    let ar = hi / nr;
+    if (ar > CONFIG.stairs.riserHeight.max) { nr = Math.ceil(hi / CONFIG.stairs.riserHeight.max); ar = hi / nr; }
+    else if (ar < CONFIG.stairs.riserHeight.min) { nr = Math.max(1, Math.floor(hi / CONFIG.stairs.riserHeight.min)); ar = hi / nr; }
+    const nt  = nr - 1;
+    const bpt = sc.boardsPerTread || CONFIG.stairs.boardsPerTread.default;
+    const td  = bpt * CONFIG.boards.width + (bpt - 1) * CONFIG.boards.gap;
+    const swFt = sc.width || CONFIG.stairs.defaultWidth;
+    const totalRunFeet = (nt * td) / 12;
+
+    let lShapedData = null;
+    if (sc.shape === 'l-shaped') {
+        const ldf   = typeof sc.landingDepth === 'number' ? sc.landingDepth : CONFIG.stairs.landingDepth;
+        const split = typeof sc.landingSplit === 'number' ? sc.landingSplit : 0.5;
+        let tbl = Math.max(1, Math.round(nt * split));
+        if (tbl >= nt) tbl = nt - 1;
+        const tal = nt - tbl, rbl = tbl + 1;
+        lShapedData = {
+            treadsBeforeLanding: tbl, treadsAfterLanding: tal,
+            risersBeforeLanding: rbl,
+            landingDepthFeet: ldf,
+            run1Feet: (tbl * td) / 12, run2Feet: (tal * td) / 12,
+            turnDirection: sc.turnDirection || 'left'
+        };
+    }
+
+    return {
+        numRisers: nr, numTreads: nt, actualRise: ar,
+        treadDepth: td, totalRunFeet, stairWidthFeet: swFt,
+        boardsPerTread: bpt, deckHeightInches: hi,
+        lShapedData,
+        isValid: nt >= 1 && ar >= CONFIG.stairs.riserHeight.min
+    };
+}
+
 function getStringerCount(stairWidthFt) {
     const minCenter = CONFIG.stairs.centerStringerMinWidth ?? 3;
     const minDouble = CONFIG.stairs.doubleCenterStringerMinWidth ?? 6;
@@ -105,18 +142,15 @@ function getStringerCount(stairWidthFt) {
 
 function calculateStairs(state) {
     const result = {
-        enabled: false,
-        stairCount: 0,
+        enabled: false, stairCount: 0,
         treadBoards: { byLength: { 12: 0, 16: 0, 20: 0 }, total: 0, linealFeet: 0 },
         riserBoards: { byLength: { 12: 0, 16: 0, 20: 0 }, total: 0, linealFeet: 0 },
         stringers: { count: 0, lengthEach: 0, totalLinealFeet: 0 },
         landingBoards: { byLength: { 12: 0, 16: 0, 20: 0 }, total: 0, linealFeet: 0 },
-        totalCompositeLF: 0,
-        totalCompositeBoards: 0
+        totalCompositeLF: 0, totalCompositeBoards: 0
     };
 
     if (!state.stairsEnabled || !state.stairs?.length) return result;
-
     result.enabled = true;
     const bwFt = CONFIG.boards.width / 12;
     const gapFt = CONFIG.boards.gap / 12;
@@ -125,35 +159,28 @@ function calculateStairs(state) {
         if (!stair.enabled) return;
         result.stairCount++;
 
-        const dims = calculateStairDimensions(stair, state);
+        const dims = calcStairDims(stair, state);
         if (!dims?.isValid) return;
 
         const sw = dims.stairWidthFeet;
         const treadBoardLen = selectOptimalBoardLength(sw);
 
-        // Tread boards: numTreads * boardsPerTread
         const treadCount = dims.numTreads * dims.boardsPerTread;
         result.treadBoards.byLength[treadBoardLen] = (result.treadBoards.byLength[treadBoardLen] || 0) + treadCount;
         result.treadBoards.total += treadCount;
         result.treadBoards.linealFeet += treadCount * treadBoardLen;
 
-        // Riser boards: one board per riser, full stair width
-        // Each riser is one board tall (riser height ~7" fits within one 5.5" board with overlap)
         const riserCount = dims.numRisers;
         result.riserBoards.byLength[treadBoardLen] = (result.riserBoards.byLength[treadBoardLen] || 0) + riserCount;
         result.riserBoards.total += riserCount;
         result.riserBoards.linealFeet += riserCount * treadBoardLen;
 
-        // Stringers: pressure-treated 2x12 lumber
         const stringerCount = getStringerCount(sw);
-        const stringerLen = Math.sqrt(
-            (state.deckHeight * state.deckHeight) + (dims.totalRunFeet * dims.totalRunFeet)
-        );
+        const stringerLen = Math.sqrt(state.deckHeight * state.deckHeight + dims.totalRunFeet * dims.totalRunFeet);
         result.stringers.count += stringerCount;
         result.stringers.lengthEach = Math.max(result.stringers.lengthEach, stringerLen);
         result.stringers.totalLinealFeet += stringerCount * stringerLen;
 
-        // Landing boards (L-shaped stairs)
         if (stair.shape === 'l-shaped' && dims.lShapedData) {
             const ld = dims.lShapedData;
             const landingWidth = sw + ld.run2Feet;
@@ -168,7 +195,6 @@ function calculateStairs(state) {
 
     result.totalCompositeBoards = result.treadBoards.total + result.riserBoards.total + result.landingBoards.total;
     result.totalCompositeLF = result.treadBoards.linealFeet + result.riserBoards.linealFeet + result.landingBoards.linealFeet;
-
     return result;
 }
 
@@ -183,7 +209,6 @@ function applyWaste(state, boards, hw, stairs) {
         });
     }
 
-    // Apply waste to stair composite boards
     const stairWithWaste = { ...stairs };
     if (stairs.enabled) {
         const applyWasteToGroup = (group) => {
@@ -194,7 +219,6 @@ function applyWaste(state, boards, hw, stairs) {
                     wasted.byLength[l] = a;
                     wasted.total += a;
                     wasted.linealFeet += a * +l;
-                    // Also add to main board totals
                     byLen[l] = (byLen[l] || 0) + a;
                     total += a;
                     lf += a * +l;
@@ -224,8 +248,6 @@ function calculateCosts(state, data) {
     const lo  = lf * CONFIG.pricing.materialPerLF.min;
     const hi  = lf * CONFIG.pricing.materialPerLF.max;
     const wk  = lf * state.pricePerLF;
-
-    // Stringer cost (pressure-treated lumber, ~$2-3/LF for 2x12)
     const stringerCost = data.stairs.enabled ? data.stairs.stringers.totalLinealFeet * 3 : 0;
 
     return {
