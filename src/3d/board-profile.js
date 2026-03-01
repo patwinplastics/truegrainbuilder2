@@ -12,11 +12,9 @@
  *   group 0 — side wall quads  → material index 0 (textured)
  *   group 1 — end cap tris     → material index 1 (solid color)
  *
- * End caps use THREE.Earcut.triangulate to correctly handle the
- * non-convex profile (two groove notches). Fan triangulation produces
- * crossing triangles in concave regions.
- *
  * THREE is a global loaded via CDN <script> tag in index.html.
+ * THREE.Earcut is accessed lazily (first geometry call) to avoid
+ * module-parse-time reference before CDN script has executed.
  * @module board-profile
  */
 
@@ -34,8 +32,7 @@ export const BOARD_GAP_FT   = 0.125 * IN;
 export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
 
 // Profile points (inches): X = board width (centered), Y = 0 at top, negative downward.
-// Traces CW when viewed from the near end (-Z).
-// Non-convex: has two groove notches at +X and -X sides.
+// Traces CW when viewed from near end (-Z). Non-convex: two groove notches each side.
 const PROFILE_IN = [
   [-2.65,         0           ],
   [ 2.65,         0           ],
@@ -118,20 +115,20 @@ const PROFILE_FT = PROFILE_IN.map(([x, y]) => [x * IN, y * IN]);
 const N = PROFILE_FT.length;
 const HALF_W = BOARD_PROFILE.widthFt / 2;
 
-// Precompute earcut indices once — same for every board length.
-// Earcut takes a flat [x,y,x,y,...] array in 2D.
-// We use profile X and Y as the 2D coordinates.
-const _earcutFlat = PROFILE_FT.flatMap(([x, y]) => [x, y]);
-const _earcutTris = THREE.Earcut.triangulate(_earcutFlat, null, 2);
-// _earcutTris is [i0,i1,i2, i0,i1,i2, ...] with CCW winding for +Y-up space.
-// Our profile Y is negative-downward, so winding appears CW from -Z — correct for near cap.
-// Far cap needs reversed winding.
+// Lazily computed on first createBoardGeometry() call so THREE is guaranteed available.
+let _earcutTris = null;
+function getEarcutTris() {
+  if (!_earcutTris) {
+    const flat = PROFILE_FT.flatMap(([x, y]) => [x, y]);
+    _earcutTris = THREE.Earcut.triangulate(flat, null, 2);
+  }
+  return _earcutTris;
+}
 
 export function createBoardGeometry(lengthFt) {
   const zN = -lengthFt / 2;
   const zF =  lengthFt / 2;
 
-  // 4 rings x N vertices: near-side, far-side, near-cap (isolated), far-cap (isolated)
   const positions = new Float32Array(N * 4 * 3);
   const uvs       = new Float32Array(N * 4 * 2);
 
@@ -168,15 +165,14 @@ export function createBoardGeometry(lengthFt) {
     sideIndices.push(ni, fj, nj);
   }
 
-  // End caps — earcut triangles offset into isolated cap rings
+  // End caps using earcut triangles (lazily initialized)
+  const tris = getEarcutTris();
   const NC = 2 * N;
   const FC = 3 * N;
-  for (let t = 0; t < _earcutTris.length; t += 3) {
-    const a = _earcutTris[t], b = _earcutTris[t+1], c = _earcutTris[t+2];
-    // Near cap: earcut winding faces -Z (correct as-is)
-    capIndices.push(NC + a, NC + b, NC + c);
-    // Far cap: reverse winding to face +Z
-    capIndices.push(FC + a, FC + c, FC + b);
+  for (let t = 0; t < tris.length; t += 3) {
+    const a = tris[t], b = tris[t+1], c = tris[t+2];
+    capIndices.push(NC + a, NC + b, NC + c); // near cap: faces -Z
+    capIndices.push(FC + a, FC + c, FC + b); // far  cap: reversed, faces +Z
   }
 
   const allIndices = [...sideIndices, ...capIndices];
