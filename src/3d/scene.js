@@ -1,6 +1,7 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Three.js Scene Manager
 // Ultra-Realistic Rendering Edition
+// No external sky/HDRI assets required.
 // ============================================================
 import { CONFIG }                                             from '../config.js';
 import { state }                                              from '../state.js';
@@ -26,72 +27,19 @@ let sceneInitialized = false;
 let isBuilding       = false;
 let pendingBuild     = false;
 let contextLost      = false;
-let envMapLoaded     = false;
 
 export const getScene    = () => scene;
 export const getCamera   = () => camera;
 export const getRenderer = () => renderer;
 
 // ============================================================
-// HDRI Environment Loader
-// Falls back to a synthetic PMREMGenerator sky if no .hdr file
-// is found, so the app never breaks without the asset.
-// ============================================================
-function loadEnvironment() {
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    pmrem.compileEquirectangularShader();
-
-    const hdriPath = CONFIG.hdriPath || 'hdri/outdoor_midday.hdr';
-
-    // Try RGBELoader if available (loaded via CDN in index.html)
-    if (typeof THREE.RGBELoader !== 'undefined') {
-        new THREE.RGBELoader()
-            .load(
-                hdriPath,
-                (hdrTex) => {
-                    const envMap = pmrem.fromEquirectangular(hdrTex).texture;
-                    scene.environment = envMap;
-                    scene.background  = envMap;
-                    hdrTex.dispose();
-                    pmrem.dispose();
-                    envMapLoaded = true;
-                },
-                undefined,
-                () => {
-                    // HDRI not found — use fallback procedural sky
-                    console.info('HDRI not found, using procedural sky fallback.');
-                    _applyFallbackSky(pmrem);
-                }
-            );
-    } else {
-        _applyFallbackSky(pmrem);
-    }
-}
-
-/**
- * Fallback: build a simple gradient environment map from a
- * CubeRenderTarget so PBR materials still have something to
- * reflect when no HDRI asset is present.
- */
-function _applyFallbackSky(pmrem) {
-    // Use a lightweight sky-blue + ground-tan gradient
-    const skyScene  = new THREE.Scene();
-    skyScene.background = new THREE.Color(0x87CEEB);
-    const cubeRT = pmrem.fromScene(new THREE.RoomEnvironment());
-    scene.environment = cubeRT.texture;
-    scene.background  = new THREE.Color(0x87CEEB);
-    pmrem.dispose();
-}
-
-// ============================================================
 // Post-Processing (SSAO)
-// Loaded lazily — if EffectComposer CDN is absent, we skip
+// Only activates if EffectComposer CDN scripts are present.
 // ============================================================
 function setupPostProcessing() {
     if (typeof THREE.EffectComposer === 'undefined' ||
         typeof THREE.RenderPass     === 'undefined' ||
         typeof THREE.SSAOPass       === 'undefined') {
-        console.info('Post-processing scripts not detected — skipping SSAO.');
         composer = null;
         return;
     }
@@ -136,7 +84,6 @@ export function initScene() {
     });
 
     scene = new THREE.Scene();
-    // Background overridden by HDRI after load; set placeholder
     scene.background = new THREE.Color(0x87CEEB);
 
     // Subtle atmospheric fog — adds depth to long deck views
@@ -147,12 +94,11 @@ export function initScene() {
 
     renderer = new THREE.WebGLRenderer({
         canvas,
-        antialias:            true,
+        antialias:             true,
         preserveDrawingBuffer: true,
-        powerPreference:      'high-performance'
+        powerPreference:       'high-performance'
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    // Allow up to device native pixel ratio for sharp rendering on Retina screens
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
 
     // ── Physically correct tone mapping ──────────────────────
@@ -177,11 +123,11 @@ export function initScene() {
     controls.enableZoom    = true;
 
     // ── Lighting ─────────────────────────────────────────────
-    // Keep a low ambient so shadows aren't pure black before HDRI loads
-    const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+    // Ambient — keeps shadow areas from going pure black
+    const ambient = new THREE.AmbientLight(0xffffff, 0.35);
     scene.add(ambient);
 
-    // Primary sun — warm afternoon angle
+    // Primary sun — warm afternoon color and angle
     const sun = new THREE.DirectionalLight(0xFFF5E0, 2.2);
     sun.position.set(30, 40, 20);
     sun.castShadow = true;
@@ -189,18 +135,18 @@ export function initScene() {
     sun.shadow.mapSize.height = 4096;
     sun.shadow.bias       = -0.0005;
     sun.shadow.normalBias =  0.02;
-    // Shadow camera is tightened dynamically in executeBuildDeck()
     Object.assign(sun.shadow.camera, { near: 0.5, far: 120, left: -50, right: 50, top: 50, bottom: -50 });
     scene.add(sun);
-    scene.userData.sun = sun; // stored for dynamic frustum updates
+    scene.userData.sun = sun;
 
-    // Soft fill from the opposite side (simulates sky bounce)
+    // Sky bounce fill — cool blue from opposite side
     const fill = new THREE.DirectionalLight(0xB0CCE8, 0.6);
     fill.position.set(-20, 15, -15);
     scene.add(fill);
 
-    // ── HDRI Environment ────────────────────────────────────
-    loadEnvironment();
+    // Subtle ground bounce — warm light from below the deck
+    const ground = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.4);
+    scene.add(ground);
 
     createRealisticGrass(scene);
 
@@ -212,9 +158,7 @@ export function initScene() {
     buildDeck();
     document.getElementById('sceneLoading')?.classList.add('hidden');
 
-    // ── Post-processing ──────────────────────────────────────
     setupPostProcessing();
-
     animate();
 
     initWalkthrough(camera, renderer, controls);
@@ -288,10 +232,10 @@ function executeBuildDeck() {
         if (state.showRailings)                              createDetailedRailings(deckGroup, state);
         if (state.stairsEnabled && state.stairs?.length > 0) createAllStairs(deckGroup, state);
 
-        // Tighten sun shadow frustum to deck bounds for maximum shadow resolution
+        // Tighten shadow frustum to deck bounds for maximum shadow resolution
         const sun = scene?.userData.sun;
         if (sun) {
-            const pad  = 6;
+            const pad   = 6;
             const halfL = state.deckLength / 2 + pad;
             const halfW = state.deckWidth  / 2 + pad;
             Object.assign(sun.shadow.camera, {
