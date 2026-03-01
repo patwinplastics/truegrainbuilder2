@@ -2,19 +2,15 @@
  * TrueGrain Board Profile Geometry
  * Cross-section parsed from: Grooved-Chestnut-Decking-Wrapped.DXF
  *
- * Vertex layout per geometry:
- *   0   .. N-1   — near ring  (side walls, z = -len/2)
- *   N   .. 2N-1  — far  ring  (side walls, z = +len/2)
- *   2N  .. 3N-1  — near cap   (isolated, z = -len/2)
- *   3N  .. 4N-1  — far  cap   (isolated, z = +len/2)
+ * Vertex layout:
+ *   0   .. N-1   — near ring  (side walls)
+ *   N   .. 2N-1  — far  ring  (side walls)
+ *   2N  .. 3N-1  — near cap   (isolated)
+ *   3N  .. 4N-1  — far  cap   (isolated)
  *
- * Geometry groups:
- *   group 0 — side wall quads  → material index 0 (textured)
- *   group 1 — end cap tris     → material index 1 (solid color)
+ * Groups: 0 = textured side walls, 1 = solid color end caps.
  *
  * THREE is a global loaded via CDN <script> tag in index.html.
- * THREE.Earcut is accessed lazily (first geometry call) to avoid
- * module-parse-time reference before CDN script has executed.
  * @module board-profile
  */
 
@@ -31,8 +27,66 @@ export const BOARD_PROFILE = {
 export const BOARD_GAP_FT   = 0.125 * IN;
 export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
 
+// ── Minimal ear-clipping triangulator ────────────────────────────────────────
+// Handles simple (non-self-intersecting) polygons including non-convex ones.
+// Returns flat index array [i0,i1,i2, ...] with CCW winding for Y-up space.
+function earclip(pts) {
+  const n = pts.length;
+  if (n < 3) return [];
+  const idx = Array.from({ length: n }, (_, i) => i);
+  const tris = [];
+
+  function area2(a, b, c) {
+    return (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1])
+         - (pts[c][0] - pts[a][0]) * (pts[b][1] - pts[a][1]);
+  }
+  function inTriangle(ax, ay, bx, by, cx, cy, px, py) {
+    const d1 = (px-bx)*(ay-by) - (ax-bx)*(py-by);
+    const d2 = (px-cx)*(by-cy) - (bx-cx)*(py-cy);
+    const d3 = (px-ax)*(cy-ay) - (cx-ax)*(py-ay);
+    const neg = (d1<0)||(d2<0)||(d3<0);
+    const pos = (d1>0)||(d2>0)||(d3>0);
+    return !(neg && pos);
+  }
+  function isEar(i) {
+    const len = idx.length;
+    const prev = idx[(i - 1 + len) % len];
+    const curr = idx[i];
+    const next = idx[(i + 1) % len];
+    if (area2(prev, curr, next) <= 0) return false; // reflex
+    const ax = pts[prev][0], ay = pts[prev][1];
+    const bx = pts[curr][0], by = pts[curr][1];
+    const cx = pts[next][0], cy = pts[next][1];
+    for (let j = 0; j < len; j++) {
+      const v = idx[j];
+      if (v === prev || v === curr || v === next) continue;
+      if (inTriangle(ax, ay, bx, by, cx, cy, pts[v][0], pts[v][1])) return false;
+    }
+    return true;
+  }
+
+  let remaining = idx.length;
+  let attempts = 0;
+  let i = 0;
+  while (remaining > 3) {
+    if (attempts > remaining * 2) break; // guard against degenerate input
+    if (isEar(i % remaining)) {
+      const len = idx.length;
+      tris.push(idx[(i - 1 + len) % len], idx[i % len], idx[(i + 1) % len]);
+      idx.splice(i % remaining, 1);
+      remaining--;
+      attempts = 0;
+    } else {
+      attempts++;
+    }
+    i++;
+    if (i >= remaining) i = 0;
+  }
+  if (remaining === 3) tris.push(idx[0], idx[1], idx[2]);
+  return tris;
+}
+
 // Profile points (inches): X = board width (centered), Y = 0 at top, negative downward.
-// Traces CW when viewed from near end (-Z). Non-convex: two groove notches each side.
 const PROFILE_IN = [
   [-2.65,         0           ],
   [ 2.65,         0           ],
@@ -115,14 +169,11 @@ const PROFILE_FT = PROFILE_IN.map(([x, y]) => [x * IN, y * IN]);
 const N = PROFILE_FT.length;
 const HALF_W = BOARD_PROFILE.widthFt / 2;
 
-// Lazily computed on first createBoardGeometry() call so THREE is guaranteed available.
-let _earcutTris = null;
-function getEarcutTris() {
-  if (!_earcutTris) {
-    const flat = PROFILE_FT.flatMap(([x, y]) => [x, y]);
-    _earcutTris = THREE.Earcut.triangulate(flat, null, 2);
-  }
-  return _earcutTris;
+// Cached earcut result — computed once, reused for every board.
+let _capTris = null;
+function getCapTris() {
+  if (!_capTris) _capTris = earclip(PROFILE_FT);
+  return _capTris;
 }
 
 export function createBoardGeometry(lengthFt) {
@@ -136,19 +187,15 @@ export function createBoardGeometry(lengthFt) {
     const [x, y] = PROFILE_FT[i];
     const u = (x + HALF_W) / BOARD_PROFILE.widthFt;
 
-    // near-side (0..N-1)
     positions[i*3]         = x; positions[i*3+1]         = y; positions[i*3+2]         = zN;
     uvs[i*2] = u; uvs[i*2+1] = 0;
 
-    // far-side (N..2N-1)
     positions[(N+i)*3]     = x; positions[(N+i)*3+1]     = y; positions[(N+i)*3+2]     = zF;
     uvs[(N+i)*2] = u; uvs[(N+i)*2+1] = 1;
 
-    // near-cap isolated (2N..3N-1)
     positions[(2*N+i)*3]   = x; positions[(2*N+i)*3+1]   = y; positions[(2*N+i)*3+2]   = zN;
     uvs[(2*N+i)*2] = u; uvs[(2*N+i)*2+1] = 0;
 
-    // far-cap isolated (3N..4N-1)
     positions[(3*N+i)*3]   = x; positions[(3*N+i)*3+1]   = y; positions[(3*N+i)*3+2]   = zF;
     uvs[(3*N+i)*2] = u; uvs[(3*N+i)*2+1] = 1;
   }
@@ -156,7 +203,6 @@ export function createBoardGeometry(lengthFt) {
   const sideIndices = [];
   const capIndices  = [];
 
-  // Side wall quads
   for (let i = 0; i < N; i++) {
     const j  = (i + 1) % N;
     const ni = i,     nj = j;
@@ -165,18 +211,16 @@ export function createBoardGeometry(lengthFt) {
     sideIndices.push(ni, fj, nj);
   }
 
-  // End caps using earcut triangles (lazily initialized)
-  const tris = getEarcutTris();
+  const tris = getCapTris();
   const NC = 2 * N;
   const FC = 3 * N;
   for (let t = 0; t < tris.length; t += 3) {
     const a = tris[t], b = tris[t+1], c = tris[t+2];
-    capIndices.push(NC + a, NC + b, NC + c); // near cap: faces -Z
-    capIndices.push(FC + a, FC + c, FC + b); // far  cap: reversed, faces +Z
+    capIndices.push(NC + a, NC + b, NC + c); // near: faces -Z
+    capIndices.push(FC + a, FC + c, FC + b); // far:  reversed, faces +Z
   }
 
   const allIndices = [...sideIndices, ...capIndices];
-
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2));
