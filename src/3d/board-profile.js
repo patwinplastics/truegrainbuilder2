@@ -2,202 +2,24 @@
  * TrueGrain Board Profile Geometry
  * Cross-section parsed from: Grooved-Chestnut-Decking-Wrapped.DXF
  *
- * Profile features (all dims in inches, converted to feet for scene units):
- *   - Total width:  5.500" / 12 = 0.45833 ft
- *   - Total height: 1.001" / 12 = 0.08342 ft
- *   - Top corner radius: 0.100"
- *   - Hidden fastener grooves on each side: 0.450" deep x 0.181" tall
- *   - 45° chamfer transition to narrower bottom flange
+ * Geometry strategy: manual BufferGeometry sweep.
+ * The 75 profile points define the cross-section in the XZ plane:
+ *   profile X  -> world X  (board width, centered at 0)
+ *   profile Y  -> world Y  (depth, 0 = top surface, negative = downward)
+ * The profile is swept along world Z (board length).
  *
- * THREE is loaded globally via CDN <script> tag in index.html.
- * Do NOT import from 'three' — use the global THREE object.
+ * Place mesh at:  mesh.position.y = state.deckHeight + BOARD_PROFILE.thicknessFt
+ * For X-running:  mesh.rotation.y = Math.PI / 2
+ * For Z-running:  no rotation needed
  *
- * UV NOTE:
- *   ExtrudeGeometry UVs do not match BoxGeometry top-face UVs.
- *   remapBoardUVs() reprojects all vertex UVs using a top-down
- *   planar projection (U = x/width, V = z/length) so that
- *   createBoardMaterial()'s tex.rotation logic works unchanged.
- *
- * Applied to: straight boards, breaker boards, picture frame FILL boards
- * NOT applied to: picture frame border boards (mitered), stair treads
+ * THREE is a global loaded via CDN <script> tag in index.html.
  *
  * @module board-profile
  */
 
-// Inches to feet conversion factor
 const IN = 1 / 12;
 
-const BOARD_WIDTH_FT = 5.5 * IN;   // 0.45833 ft
-
-/**
- * 75-point profile traced CCW from top-left.
- * Coordinates in inches, centered at X=0.
- * Top = +0.5", bottom = -0.5007"
- */
-const PROFILE_POINTS_IN = [
-  [-2.65,         0.5          ],
-  [ 2.65,         0.5          ],
-  [ 2.675882,     0.496593     ],
-  [ 2.7,          0.486603     ],
-  [ 2.720711,     0.470711     ],
-  [ 2.736603,     0.45         ],
-  [ 2.746593,     0.425882     ],
-  [ 2.75,         0.4          ],
-  [ 2.75,         0.1405       ],
-  [ 2.746194,     0.121366     ],
-  [ 2.735355,     0.105145     ],
-  [ 2.719134,     0.094306     ],
-  [ 2.7,          0.0905       ],
-  [ 2.35,         0.0905       ],
-  [ 2.330866,     0.086694     ],
-  [ 2.314645,     0.075855     ],
-  [ 2.303806,     0.059634     ],
-  [ 2.3,          0.0405       ],
-  [ 2.3,         -0.0405       ],
-  [ 2.303806,    -0.059634     ],
-  [ 2.314645,    -0.075855     ],
-  [ 2.330866,    -0.086694     ],
-  [ 2.35,        -0.0905       ],
-  [ 2.7,         -0.0905       ],
-  [ 2.719134,    -0.094306     ],
-  [ 2.735355,    -0.105145     ],
-  [ 2.746194,    -0.121366     ],
-  [ 2.75,        -0.1405       ],
-  [ 2.75,        -0.1829339828 ],
-  [ 2.749039,    -0.192688     ],
-  [ 2.746194,    -0.202068     ],
-  [ 2.741573,    -0.210712     ],
-  [ 2.735355,    -0.218289     ],
-  [ 2.4676330114,-0.4860116495 ],
-  [ 2.460056,    -0.49223      ],
-  [ 2.451412,    -0.49685      ],
-  [ 2.442032,    -0.499696     ],
-  [ 2.432278,    -0.500656     ],
-  [-2.432278,    -0.500656     ],
-  [-2.442032,    -0.499696     ],
-  [-2.451412,    -0.49685      ],
-  [-2.460056,    -0.49223      ],
-  [-2.467633,    -0.486012     ],
-  [-2.7353553391,-0.2182893219 ],
-  [-2.741573,    -0.210712     ],
-  [-2.746194,    -0.202068     ],
-  [-2.749039,    -0.192688     ],
-  [-2.75,        -0.182934     ],
-  [-2.75,        -0.1405       ],
-  [-2.746194,    -0.121366     ],
-  [-2.735355,    -0.105145     ],
-  [-2.719134,    -0.094306     ],
-  [-2.7,         -0.0905       ],
-  [-2.35,        -0.0905       ],
-  [-2.330866,    -0.086694     ],
-  [-2.314645,    -0.075855     ],
-  [-2.303806,    -0.059634     ],
-  [-2.3,         -0.0405       ],
-  [-2.3,          0.0405       ],
-  [-2.303806,     0.059634     ],
-  [-2.314645,     0.075855     ],
-  [-2.330866,     0.086694     ],
-  [-2.35,         0.0905       ],
-  [-2.7,          0.0905       ],
-  [-2.719134,     0.094306     ],
-  [-2.735355,     0.105145     ],
-  [-2.746194,     0.121366     ],
-  [-2.75,         0.1405       ],
-  [-2.75,         0.4          ],
-  [-2.746593,     0.425882     ],
-  [-2.736603,     0.45         ],
-  [-2.720711,     0.470711     ],
-  [-2.7,          0.486603     ],
-  [-2.675882,     0.496593     ],
-  [-2.65,         0.5          ],
-];
-
-/**
- * Build the THREE.Shape for the board cross-section.
- * @returns {THREE.Shape}
- */
-function buildBoardProfileShape() {
-  const shape = new THREE.Shape();
-  const [sx, sy] = PROFILE_POINTS_IN[0];
-  shape.moveTo(sx * IN, sy * IN);
-  for (let i = 1; i < PROFILE_POINTS_IN.length; i++) {
-    const [x, y] = PROFILE_POINTS_IN[i];
-    shape.lineTo(x * IN, y * IN);
-  }
-  shape.closePath();
-  return shape;
-}
-
-/**
- * Remap UV attribute of an ExtrudeGeometry using top-down planar projection.
- *
- * ExtrudeGeometry's built-in UVs map the cross-section profile onto cap faces
- * and sweep 0-1 along the extrusion on side walls. Neither matches the
- * BoxGeometry top-face convention that createBoardMaterial() expects.
- *
- * This replaces every UV with:
- *   U = (vertex.x + halfWidth) / boardWidth    -> 0..1 across board width
- *   V = (vertex.z + halfLength) / boardLength  -> 0..1 along board length
- *
- * That is identical to BoxGeometry's top-face UV layout, so tex.rotation
- * in materials.js continues to work without any changes.
- *
- * @param {THREE.BufferGeometry} geo
- * @param {number} lengthFt
- */
-function remapBoardUVs(geo, lengthFt) {
-  const pos = geo.attributes.position;
-  const uv  = geo.attributes.uv;
-  const halfW = BOARD_WIDTH_FT / 2;
-  const halfL = lengthFt / 2;
-
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    uv.setXY(
-      i,
-      (x + halfW) / BOARD_WIDTH_FT,   // U: 0 at left edge, 1 at right edge
-      (z + halfL) / lengthFt           // V: 0 at near end,  1 at far end
-    );
-  }
-  uv.needsUpdate = true;
-}
-
-/**
- * Create an extruded board geometry from the DXF cross-section profile
- * with UVs remapped to match BoxGeometry top-face convention.
- *
- * Extrudes along +Z. Translate so:
- *   Y=0  = top surface (set mesh.position.y = state.deckHeight)
- *   X=0  = board center
- *   Z=0  = board center
- *
- * Rotate mesh 90° around Y when board runs along X instead of Z.
- *
- * @param {number} lengthFt
- * @returns {THREE.BufferGeometry}
- */
-export function createBoardGeometry(lengthFt) {
-  const shape = buildBoardProfileShape();
-
-  const geo = new THREE.ExtrudeGeometry(shape, {
-    steps:        1,
-    depth:        lengthFt,
-    bevelEnabled: false,
-  });
-
-  // Center and seat: Y=0 is top surface, board centered on X and Z
-  geo.translate(0, -0.5 * IN, -lengthFt / 2);
-
-  // Remap UVs to top-down planar projection (matches BoxGeometry top face)
-  remapBoardUVs(geo, lengthFt);
-
-  return geo;
-}
-
-/**
- * Board profile constants in feet.
- */
+// ── Profile constants ────────────────────────────────────────────────────────
 export const BOARD_PROFILE = {
   widthFt:        5.5   * IN,
   thicknessFt:    1.0   * IN,
@@ -206,8 +28,149 @@ export const BOARD_PROFILE = {
   grooveHeightFt: 0.181 * IN,
 };
 
-/** 1/8" install gap between board faces. Matches CONFIG.boards.gap */
-export const BOARD_GAP_FT = 0.125 * IN;
-
-/** Center-to-center board pitch for layout loops. */
+export const BOARD_GAP_FT   = 0.125 * IN;
 export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
+
+// ── DXF profile points (inches) ──────────────────────────────────────────────
+// X = board width (centered at 0, ±2.75" max)
+// Y = 0 at top surface, negative = downward into board
+const PROFILE_IN = [
+  [-2.65,         0           ],
+  [ 2.65,         0           ],
+  [ 2.675882,    -0.003407    ],
+  [ 2.7,         -0.013397    ],
+  [ 2.720711,    -0.029289    ],
+  [ 2.736603,    -0.05        ],
+  [ 2.746593,    -0.074118    ],
+  [ 2.75,        -0.1         ],
+  [ 2.75,        -0.3595      ],
+  [ 2.746194,    -0.378634    ],
+  [ 2.735355,    -0.394855    ],
+  [ 2.719134,    -0.405694    ],
+  [ 2.7,         -0.4095      ],
+  [ 2.35,        -0.4095      ],
+  [ 2.330866,    -0.413306    ],
+  [ 2.314645,    -0.424145    ],
+  [ 2.303806,    -0.440366    ],
+  [ 2.3,         -0.4595      ],
+  [ 2.3,         -0.5405      ],
+  [ 2.303806,    -0.559634    ],
+  [ 2.314645,    -0.575855    ],
+  [ 2.330866,    -0.586694    ],
+  [ 2.35,        -0.5905      ],
+  [ 2.7,         -0.5905      ],
+  [ 2.719134,    -0.594306    ],
+  [ 2.735355,    -0.605145    ],
+  [ 2.746194,    -0.621366    ],
+  [ 2.75,        -0.6405      ],
+  [ 2.75,        -0.6829      ],
+  [ 2.749039,    -0.692688    ],
+  [ 2.746194,    -0.702068    ],
+  [ 2.741573,    -0.710712    ],
+  [ 2.735355,    -0.718289    ],
+  [ 2.467633,    -0.986012    ],
+  [ 2.460056,    -0.99223     ],
+  [ 2.451412,    -0.99685     ],
+  [ 2.442032,    -0.999696    ],
+  [ 2.432278,    -1.000656    ],
+  [-2.432278,    -1.000656    ],
+  [-2.442032,    -0.999696    ],
+  [-2.451412,    -0.99685     ],
+  [-2.460056,    -0.99223     ],
+  [-2.467633,    -0.986012    ],
+  [-2.735355,    -0.718289    ],
+  [-2.741573,    -0.710712    ],
+  [-2.746194,    -0.702068    ],
+  [-2.749039,    -0.692688    ],
+  [-2.75,        -0.6829      ],
+  [-2.75,        -0.6405      ],
+  [-2.746194,    -0.621366    ],
+  [-2.735355,    -0.605145    ],
+  [-2.719134,    -0.594306    ],
+  [-2.7,         -0.5905      ],
+  [-2.35,        -0.5905      ],
+  [-2.330866,    -0.586694    ],
+  [-2.314645,    -0.575855    ],
+  [-2.303806,    -0.559634    ],
+  [-2.3,         -0.5405      ],
+  [-2.3,         -0.4595      ],
+  [-2.303806,    -0.440366    ],
+  [-2.314645,    -0.424145    ],
+  [-2.330866,    -0.413306    ],
+  [-2.35,        -0.4095      ],
+  [-2.7,         -0.4095      ],
+  [-2.719134,    -0.405694    ],
+  [-2.735355,    -0.394855    ],
+  [-2.746194,    -0.378634    ],
+  [-2.75,        -0.3595      ],
+  [-2.75,        -0.1         ],
+  [-2.746593,    -0.074118    ],
+  [-2.736603,    -0.05        ],
+  [-2.720711,    -0.029289    ],
+  [-2.7,         -0.013397    ],
+  [-2.675882,    -0.003407    ],
+  [-2.65,         0           ],
+];
+
+const PROFILE_FT = PROFILE_IN.map(([x, y]) => [x * IN, y * IN]);
+const N = PROFILE_FT.length;
+const HALF_W = BOARD_PROFILE.widthFt / 2;
+
+/**
+ * Build a BufferGeometry for one board by sweeping the DXF profile along Z.
+ *
+ * @param {number} lengthFt
+ * @returns {THREE.BufferGeometry}
+ */
+export function createBoardGeometry(lengthFt) {
+  const zN = -lengthFt / 2;
+  const zF =  lengthFt / 2;
+
+  // ── Positions: near ring (z=zN) then far ring (z=zF) ──────────────────────
+  const positions = new Float32Array(N * 2 * 3);
+  for (let i = 0; i < N; i++) {
+    const [x, y] = PROFILE_FT[i];
+    positions[i * 3]     = x;  positions[i * 3 + 1] = y;  positions[i * 3 + 2] = zN;
+    positions[(N + i) * 3]     = x;
+    positions[(N + i) * 3 + 1] = y;
+    positions[(N + i) * 3 + 2] = zF;
+  }
+
+  // ── UVs: top-down planar projection ────────────────────────────────────────
+  // U = x across board width (0..1), V = z along board length (0..1)
+  // Matches BoxGeometry top-face UV convention so materials.js tex.rotation works.
+  const uvs = new Float32Array(N * 2 * 2);
+  for (let i = 0; i < N; i++) {
+    const [x] = PROFILE_FT[i];
+    const u = (x + HALF_W) / BOARD_PROFILE.widthFt;
+    uvs[i * 2]         = u;  uvs[i * 2 + 1]         = 0; // near end V=0
+    uvs[(N + i) * 2]   = u;  uvs[(N + i) * 2 + 1]   = 1; // far  end V=1
+  }
+
+  // ── Indices ─────────────────────────────────────────────────────────────────
+  const maxTris = (N - 2) * 2 + N * 2; // end caps + side quads
+  const indices = [];
+
+  // End caps — fan triangulation from vertex 0
+  for (let i = 1; i < N - 1; i++) {
+    indices.push(0, i + 1, i);         // near cap (CW from +Z = correct outward normal)
+    indices.push(N, N + i, N + i + 1); // far  cap (CCW from +Z)
+  }
+
+  // Side quads — one quad per profile edge
+  for (let i = 0; i < N; i++) {
+    const j  = (i + 1) % N;
+    const ni = i,     nj = j;
+    const fi = N + i, fj = N + j;
+    indices.push(ni, fi, fj);  // tri 1
+    indices.push(ni, fj, nj);  // tri 2
+  }
+
+  // ── Assemble ─────────────────────────────────────────────────────────────────
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
