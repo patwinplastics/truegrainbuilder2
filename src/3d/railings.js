@@ -1,74 +1,21 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Railing System
-// Realistic wood balusters: tapered cylinders, wood texture,
-// matching deck color on posts, balusters, and rails.
+// White balusters, posts, and rails.
 // ============================================================
 import { CONFIG }        from '../config.js';
 import { BOARD_PROFILE } from './board-profile.js';
-import { createBoardMaterial } from './materials.js';
-
-// Shared geometry cache for railing elements
-const _geoCache = {};
-
-function getBalusterGeo(bh) {
-    const key = `bal_${bh.toFixed(3)}`;
-    if (_geoCache[key]) return _geoCache[key];
-    // Tapered cylinder: slightly wider at base (0.055ft) than top (0.04ft)
-    // 8 radial segments = octagonal cross-section like a real routed baluster
-    const geo = new THREE.CylinderGeometry(0.04, 0.055, bh, 8);
-    _geoCache[key] = geo;
-    return geo;
-}
-
-function getPostGeo(ph, ps) {
-    const key = `post_${ph.toFixed(3)}_${ps.toFixed(3)}`;
-    if (_geoCache[key]) return _geoCache[key];
-    // Posts stay square but with enough segments for smooth shadow edges
-    const geo = new THREE.BoxGeometry(ps, ph, ps);
-    _geoCache[key] = geo;
-    return geo;
-}
-
-function getRailGeo(len, rh, rt, isX) {
-    // Rails are unique per segment length — not cached
-    return new THREE.BoxGeometry(
-        isX ? len : rt,
-        rh,
-        isX ? rt : len
-    );
-}
 
 export function createDetailedRailings(deckGroup, state) {
-    const ph = 3, ps = 0.29, rh = 0.29, rt = 0.125, bsp = 0.33, bro = 0.25;
+    const ph = 3, ps = 0.29, rh = 0.29, rt = 0.125, bs = 0.125, bsp = 0.33, bro = 0.25;
     const wh  = state.deckHeight + BOARD_PROFILE.thicknessFt;
+    const mat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.6 });
+    const pg  = new THREE.BoxGeometry(ps, ph, ps);
+    const bh  = ph - rh - bro;
+    const bg  = new THREE.BoxGeometry(bs, bh, bs);
+    const topY = wh + ph - rh / 2;
+    const botY = wh + bro + rh / 2;
+    const balY = wh + bro + rh + bh / 2;
 
-    // ── Materials ─────────────────────────────────────────────
-    // Posts and rails: same wood texture as the deck boards
-    const colorConfig = CONFIG.colors.find(c => c.id === state.mainColor) || CONFIG.colors[0];
-    const woodMat = createBoardMaterial(colorConfig, 4, true);
-
-    // Balusters: slightly lighter tint of the same color to differentiate
-    // from the heavier post/rail members, matching a real painted-wood look
-    const balMat = new THREE.MeshStandardMaterial({
-        color:     new THREE.Color(colorConfig.hex).multiplyScalar(0.95),
-        roughness: 0.80,
-        metalness: 0.0,
-    });
-    // Share the same diffuse texture as the board material if loaded
-    if (woodMat.map) {
-        balMat.map = woodMat.map;
-        balMat.color.setHex(0xFFFFFF);
-    }
-
-    const topY  = wh + ph - rh / 2;
-    const botY  = wh + bro + rh / 2;
-    const bh    = ph - rh - bro;          // baluster clear height
-    const balY  = wh + bro + rh + bh / 2; // baluster center Y
-
-    const balGeo  = getBalusterGeo(bh);
-    const postGeo = getPostGeo(ph, ps);
-
-    // Build stair gap info per edge
     const gaps = buildStairGaps(state);
 
     const hL = state.deckLength / 2, hW = state.deckWidth / 2;
@@ -84,69 +31,53 @@ export function createDetailedRailings(deckGroup, state) {
         const segments = splitEdgeByGaps(edge, edgeGaps);
 
         segments.forEach(seg => {
-            const dx     = seg.e[0] - seg.s[0];
-            const dz     = seg.e[1] - seg.s[1];
-            const segLen = Math.sqrt(dx * dx + dz * dz);
-            if (segLen < 0.5) return;
-
-            // ── Corner posts ───────────────────────────────────────
             [seg.s, seg.e].forEach(([px, pz]) => {
-                const post = new THREE.Mesh(postGeo, woodMat);
+                const post = new THREE.Mesh(pg, mat);
                 post.position.set(px, wh + ph / 2, pz);
-                post.castShadow    = true;
-                post.receiveShadow = true;
+                post.castShadow = true;
                 deckGroup.add(post);
             });
 
-            // ── Intermediate posts every 6ft ─────────────────────
+            const segLen = Math.sqrt((seg.e[0]-seg.s[0])**2 + (seg.e[1]-seg.s[1])**2);
+            if (segLen < 0.5) return;
+
+            const dx = seg.e[0] - seg.s[0], dz = seg.e[1] - seg.s[1];
             const numPosts = Math.floor(segLen / 6);
             for (let i = 1; i <= numPosts; i++) {
                 const t = (i * 6) / segLen;
                 if (t >= 1) break;
-                const ip = new THREE.Mesh(postGeo, woodMat);
+                const ip = new THREE.Mesh(pg, mat);
                 ip.position.set(seg.s[0] + dx * t, wh + ph / 2, seg.s[1] + dz * t);
-                ip.castShadow    = true;
-                ip.receiveShadow = true;
+                ip.castShadow = true;
                 deckGroup.add(ip);
             }
 
-            // ── Top and bottom rails ───────────────────────────
-            const cx = (seg.s[0] + seg.e[0]) / 2;
-            const cz = (seg.s[1] + seg.e[1]) / 2;
+            const cx = (seg.s[0] + seg.e[0]) / 2, cz = (seg.s[1] + seg.e[1]) / 2;
             [topY, botY].forEach(ry => {
-                const rail = new THREE.Mesh(getRailGeo(segLen, rh, rt, edge.isX), woodMat);
+                const rail = new THREE.Mesh(
+                    new THREE.BoxGeometry(edge.isX ? segLen : rt, rh, edge.isX ? rt : segLen),
+                    mat
+                );
                 rail.position.set(cx, ry, cz);
-                rail.castShadow    = true;
-                rail.receiveShadow = true;
+                rail.castShadow = true;
                 deckGroup.add(rail);
             });
 
-            // ── Balusters ─────────────────────────────────────
             const numBals = Math.floor(segLen / bsp);
-            // Rotation so cylinder's axis aligns along the rail run direction
-            const balRotY = edge.isX ? 0 : 0; // cylinders are already vertical
             for (let i = 1; i < numBals; i++) {
                 const t = i / numBals;
-                const bal = new THREE.Mesh(balGeo, balMat);
-                bal.position.set(
-                    seg.s[0] + dx * t,
-                    balY,
-                    seg.s[1] + dz * t
-                );
-                bal.castShadow    = true;
-                bal.receiveShadow = true;
+                const bal = new THREE.Mesh(bg, mat);
+                bal.position.set(seg.s[0] + dx * t, balY, seg.s[1] + dz * t);
+                bal.castShadow = true;
                 deckGroup.add(bal);
             }
         });
     });
 }
 
-// ============================================================
-// Stair gap helpers (unchanged)
-// ============================================================
 function buildStairGaps(state) {
     if (!state.stairsEnabled || !state.stairs?.length) return [];
-    const gaps   = [];
+    const gaps = [];
     const margin = 0.25;
     state.stairs.forEach(stair => {
         if (!stair.enabled) return;
@@ -165,48 +96,27 @@ function buildStairGaps(state) {
 
 function splitEdgeByGaps(edge, edgeGaps) {
     if (!edgeGaps.length) return [{ s: [...edge.s], e: [...edge.e] }];
-
-    const dx = edge.e[0] - edge.s[0];
-    const dz = edge.e[1] - edge.s[1];
-    const edgeLen = Math.sqrt(dx * dx + dz * dz);
+    const dx = edge.e[0] - edge.s[0], dz = edge.e[1] - edge.s[1];
+    const edgeLen = Math.sqrt(dx*dx + dz*dz);
     if (edgeLen < 0.01) return [];
-
     const tRanges = edgeGaps.map(gap => {
-        let tCenter;
-        if (edge.isX) {
-            tCenter = (gap.center - edge.s[0]) / dx;
-        } else {
-            tCenter = (gap.center - edge.s[1]) / dz;
-        }
-        const tHalf = gap.halfWidth / edgeLen;
+        const tCenter = edge.isX ? (gap.center - edge.s[0]) / dx : (gap.center - edge.s[1]) / dz;
+        const tHalf   = gap.halfWidth / edgeLen;
         return { lo: Math.max(0, tCenter - tHalf), hi: Math.min(1, tCenter + tHalf) };
     }).sort((a, b) => a.lo - b.lo);
-
     const merged = [];
     tRanges.forEach(r => {
-        if (merged.length && r.lo <= merged[merged.length - 1].hi) {
-            merged[merged.length - 1].hi = Math.max(merged[merged.length - 1].hi, r.hi);
-        } else {
-            merged.push({ ...r });
-        }
+        if (merged.length && r.lo <= merged[merged.length-1].hi)
+            merged[merged.length-1].hi = Math.max(merged[merged.length-1].hi, r.hi);
+        else merged.push({ ...r });
     });
-
     const segments = [];
     let cursor = 0;
     merged.forEach(range => {
-        if (range.lo > cursor + 0.01) {
-            segments.push({
-                s: [edge.s[0] + dx * cursor,    edge.s[1] + dz * cursor],
-                e: [edge.s[0] + dx * range.lo,  edge.s[1] + dz * range.lo]
-            });
-        }
+        if (range.lo > cursor + 0.01)
+            segments.push({ s: [edge.s[0]+dx*cursor, edge.s[1]+dz*cursor], e: [edge.s[0]+dx*range.lo, edge.s[1]+dz*range.lo] });
         cursor = range.hi;
     });
-    if (cursor < 0.99) {
-        segments.push({
-            s: [edge.s[0] + dx * cursor, edge.s[1] + dz * cursor],
-            e: [...edge.e]
-        });
-    }
+    if (cursor < 0.99) segments.push({ s: [edge.s[0]+dx*cursor, edge.s[1]+dz*cursor], e: [...edge.e] });
     return segments;
 }
