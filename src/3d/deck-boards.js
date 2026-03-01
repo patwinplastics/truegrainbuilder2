@@ -44,6 +44,22 @@ function createStraightBoards(deckGroup, state, colorConfig) {
     }
 }
 
+/**
+ * Picture frame: border boards on ALL 4 sides, fill boards inset.
+ *
+ * Layout (top-down view, boards run along length by default):
+ *
+ *   LLLL  FRONT BORDER (along X, full deckLength)  RRRR
+ *   L  +----------------------------------+  R
+ *   L  |        fill boards               |  R
+ *   L  |        (run along X)             |  R
+ *   L  +----------------------------------+  R
+ *   LLLL  BACK BORDER (along X, full deckLength)   RRRR
+ *
+ *   LEFT/RIGHT borders run along Z (full deckWidth),
+ *   perpendicular to front/back borders.
+ *   They sit at a slightly higher Y to visually overlap at corners.
+ */
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
     const boardY = state.deckHeight + bt/2;
@@ -51,31 +67,65 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const bwFt   = bc * ew;
     const bColor = state.borderSameColor ? colorConfig : (CONFIG.colors.find(c=>c.id===state.borderColor)||colorConfig);
     const isLen  = state.boardDirection === 'length';
+    const dL = state.deckLength;
+    const dW = state.deckWidth;
 
-    for (let i=0; i<bc; i++) {
-        const off = i * ew + bw/2;
-        [
-            [state.deckLength, bt, bw, 0,                      boardY, -state.deckWidth/2+off,  false, state.deckLength],
-            [state.deckLength, bt, bw, 0,                      boardY,  state.deckWidth/2-off,  false, state.deckLength],
-            [bw, bt, state.deckWidth-2*bwFt, -state.deckLength/2+off, boardY, 0, true,  state.deckWidth-2*bwFt],
-            [bw, bt, state.deckWidth-2*bwFt,  state.deckLength/2-off, boardY, 0, true,  state.deckWidth-2*bwFt]
-        ].forEach(([w,ht,d,x,y,z,rw,len]) => {
-            const m=new THREE.Mesh(new THREE.BoxGeometry(w,ht,d), createBoardMaterial(bColor,len,rw,`brd${i}_${x.toFixed(1)}_${z.toFixed(1)}`));
-            m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; deckGroup.add(m);
-        });
+    // Front/back border boards: run along X (deckLength), full length
+    for (let i = 0; i < bc; i++) {
+        const off = i * ew + bw / 2;
+        // Front border (negative Z edge)
+        const fb = new THREE.Mesh(
+            new THREE.BoxGeometry(dL, bt, bw),
+            createBoardMaterial(bColor, dL, false, `brd_front_${i}`)
+        );
+        fb.position.set(0, boardY, -dW / 2 + off);
+        fb.castShadow = fb.receiveShadow = true;
+        deckGroup.add(fb);
+
+        // Back border (positive Z edge)
+        const bb = new THREE.Mesh(
+            new THREE.BoxGeometry(dL, bt, bw),
+            createBoardMaterial(bColor, dL, false, `brd_back_${i}`)
+        );
+        bb.position.set(0, boardY, dW / 2 - off);
+        bb.castShadow = bb.receiveShadow = true;
+        deckGroup.add(bb);
+
+        // Left border (negative X edge): runs along Z, full deckWidth
+        const lb = new THREE.Mesh(
+            new THREE.BoxGeometry(bw, bt, dW),
+            createBoardMaterial(bColor, dW, true, `brd_left_${i}`)
+        );
+        lb.position.set(-dL / 2 + off, boardY + bt * 0.01, 0);
+        lb.castShadow = lb.receiveShadow = true;
+        deckGroup.add(lb);
+
+        // Right border (positive X edge): runs along Z, full deckWidth
+        const rb = new THREE.Mesh(
+            new THREE.BoxGeometry(bw, bt, dW),
+            createBoardMaterial(bColor, dW, true, `brd_right_${i}`)
+        );
+        rb.position.set(dL / 2 - off, boardY + bt * 0.01, 0);
+        rb.castShadow = rb.receiveShadow = true;
+        deckGroup.add(rb);
     }
 
-    const iLen  = state.deckLength - 2*bwFt;
-    const iWid  = state.deckWidth  - 2*bwFt;
+    // Fill boards: inset by bwFt on all 4 sides
+    const iLen  = dL - 2 * bwFt;
+    const iWid  = dW - 2 * bwFt;
     const run   = isLen ? iLen : iWid;
     const cov   = isLen ? iWid : iLen;
     const nRows = Math.ceil(cov / ew);
-    for (let r=0; r<nRows; r++) {
-        const co  = (r*ew)-cov/2+bw/2;
+    for (let r = 0; r < nRows; r++) {
+        const co  = (r * ew) - cov / 2 + bw / 2;
         const mat = createBoardMaterial(colorConfig, run, !isLen, `pf${r}`);
-        const m   = new THREE.Mesh(new THREE.BoxGeometry(isLen?run:bw, bt, isLen?bw:run), mat);
-        m.position.set(isLen?0:co, boardY, isLen?co:0);
-        m.castShadow=m.receiveShadow=true; deckGroup.add(m);
+        const m   = new THREE.Mesh(
+            new THREE.BoxGeometry(isLen ? run : bw, bt, isLen ? bw : run),
+            mat
+        );
+        m.position.set(isLen ? 0 : co, boardY, isLen ? co : 0);
+        m.castShadow = m.receiveShadow = true;
+        deckGroup.add(m);
     }
 }
 
