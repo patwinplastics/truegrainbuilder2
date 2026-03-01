@@ -109,6 +109,39 @@ function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, mater
 }
 
 // ============================================================
+// Compute fill-board segments clamped to the inner fill area.
+// Reuses layout segments when available; otherwise subdivides
+// into equal pieces of roughly maxSegFt (default 6 ft).
+// ============================================================
+function computeFillSegments(run, gap, layoutSegments) {
+    const segs = [];
+    const maxSegFt = 6;
+
+    if (layoutSegments && layoutSegments.length > 0) {
+        let remaining = run;
+        for (let i = 0; i < layoutSegments.length; i++) {
+            if (remaining <= 0) break;
+            const raw = layoutSegments[i].actualLength || layoutSegments[i].length;
+            const sl  = Math.min(raw, remaining);
+            segs.push(sl);
+            remaining -= sl + gap;
+        }
+        // If layout segments didn't cover the full fill run, pad with equal pieces
+        if (remaining > 0) {
+            const n = Math.ceil(remaining / maxSegFt);
+            const piece = (remaining - Math.max(0, n - 1) * gap) / n;
+            for (let j = 0; j < n; j++) segs.push(piece);
+        }
+    } else {
+        // No segments available: equal subdivision
+        const n = Math.max(1, Math.ceil(run / maxSegFt));
+        const piece = (run - Math.max(0, n - 1) * gap) / n;
+        for (let j = 0; j < n; j++) segs.push(piece);
+    }
+    return segs;
+}
+
+// ============================================================
 // Picture frame — precise 45-degree mitered corners
 // ============================================================
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
@@ -156,7 +189,7 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         ));
     }
 
-    // Fill boards
+    // Fill boards — subdivided into segments for proper texture mapping
     const isLen  = state.boardDirection === 'length';
     const bwFt   = bc * ew;
     const iLen   = dL - 2 * bwFt;
@@ -164,14 +197,28 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const run    = isLen ? iLen : iWid;
     const cov    = isLen ? iWid : iLen;
     const nRows  = Math.ceil(cov / ew);
+
+    const fillSegs = computeFillSegments(run, g, state.boardLayout?.segments);
+    // All fill segments share one material (same color + rotation)
+    const fillMat = createBoardMaterial(colorConfig, run, !isLen, 'pf_fill');
+
     for (let r = 0; r < nRows; r++) {
-        const co  = (r * ew) - cov / 2 + bw / 2;
-        const mat = createBoardMaterial(colorConfig, run, !isLen, `pf${r}`);
-        const m   = new THREE.Mesh(
-            new THREE.BoxGeometry(isLen ? run : bw, bt, isLen ? bw : run), mat);
-        m.position.set(isLen ? 0 : co, state.deckHeight + bt / 2, isLen ? co : 0);
-        m.castShadow = m.receiveShadow = true;
-        deckGroup.add(m);
+        const co = (r * ew) - cov / 2 + bw / 2;
+        let ro = -run / 2;
+        for (let si = 0; si < fillSegs.length; si++) {
+            const sl = fillSegs[si];
+            if (sl <= 0) continue;
+            const m = new THREE.Mesh(
+                new THREE.BoxGeometry(isLen ? sl : bw, bt, isLen ? bw : sl), fillMat);
+            m.position.set(
+                isLen ? ro + sl / 2 : co,
+                state.deckHeight + bt / 2,
+                isLen ? co : ro + sl / 2
+            );
+            m.castShadow = m.receiveShadow = true;
+            deckGroup.add(m);
+            ro += sl + g;
+        }
     }
 }
 
