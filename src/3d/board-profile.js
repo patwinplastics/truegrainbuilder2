@@ -2,15 +2,19 @@
  * TrueGrain Board Profile Geometry
  * Cross-section parsed from: Grooved-Chestnut-Decking-Wrapped.DXF
  *
- * Vertex layout:
+ * Vertex layout per geometry:
  *   0   .. N-1   — near ring  (side walls, z = -len/2)
  *   N   .. 2N-1  — far  ring  (side walls, z = +len/2)
- *   2N  .. 3N-1  — near cap   (isolated copy, z = -len/2)
- *   3N  .. 4N-1  — far  cap   (isolated copy, z = +len/2)
+ *   2N  .. 3N-1  — near cap   (isolated, z = -len/2)
+ *   3N  .. 4N-1  — far  cap   (isolated, z = +len/2)
  *
  * Geometry groups:
  *   group 0 — side wall quads  → material index 0 (textured)
  *   group 1 — end cap tris     → material index 1 (solid color)
+ *
+ * End caps use THREE.Earcut.triangulate to correctly handle the
+ * non-convex profile (two groove notches). Fan triangulation produces
+ * crossing triangles in concave regions.
  *
  * THREE is a global loaded via CDN <script> tag in index.html.
  * @module board-profile
@@ -31,6 +35,7 @@ export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
 
 // Profile points (inches): X = board width (centered), Y = 0 at top, negative downward.
 // Traces CW when viewed from the near end (-Z).
+// Non-convex: has two groove notches at +X and -X sides.
 const PROFILE_IN = [
   [-2.65,         0           ],
   [ 2.65,         0           ],
@@ -113,32 +118,40 @@ const PROFILE_FT = PROFILE_IN.map(([x, y]) => [x * IN, y * IN]);
 const N = PROFILE_FT.length;
 const HALF_W = BOARD_PROFILE.widthFt / 2;
 
+// Precompute earcut indices once — same for every board length.
+// Earcut takes a flat [x,y,x,y,...] array in 2D.
+// We use profile X and Y as the 2D coordinates.
+const _earcutFlat = PROFILE_FT.flatMap(([x, y]) => [x, y]);
+const _earcutTris = THREE.Earcut.triangulate(_earcutFlat, null, 2);
+// _earcutTris is [i0,i1,i2, i0,i1,i2, ...] with CCW winding for +Y-up space.
+// Our profile Y is negative-downward, so winding appears CW from -Z — correct for near cap.
+// Far cap needs reversed winding.
+
 export function createBoardGeometry(lengthFt) {
   const zN = -lengthFt / 2;
   const zF =  lengthFt / 2;
 
   // 4 rings x N vertices: near-side, far-side, near-cap (isolated), far-cap (isolated)
-  const TOTAL_VERTS = N * 4;
-  const positions = new Float32Array(TOTAL_VERTS * 3);
-  const uvs       = new Float32Array(TOTAL_VERTS * 2);
+  const positions = new Float32Array(N * 4 * 3);
+  const uvs       = new Float32Array(N * 4 * 2);
 
   for (let i = 0; i < N; i++) {
     const [x, y] = PROFILE_FT[i];
     const u = (x + HALF_W) / BOARD_PROFILE.widthFt;
 
-    // near-side ring (0..N-1)
-    positions[i*3]   = x; positions[i*3+1]   = y; positions[i*3+2]   = zN;
+    // near-side (0..N-1)
+    positions[i*3]         = x; positions[i*3+1]         = y; positions[i*3+2]         = zN;
     uvs[i*2] = u; uvs[i*2+1] = 0;
 
-    // far-side ring (N..2N-1)
-    positions[(N+i)*3]   = x; positions[(N+i)*3+1]   = y; positions[(N+i)*3+2]   = zF;
+    // far-side (N..2N-1)
+    positions[(N+i)*3]     = x; positions[(N+i)*3+1]     = y; positions[(N+i)*3+2]     = zF;
     uvs[(N+i)*2] = u; uvs[(N+i)*2+1] = 1;
 
-    // near-cap ring (2N..3N-1) — isolated so normals don’t bleed from side walls
+    // near-cap isolated (2N..3N-1)
     positions[(2*N+i)*3]   = x; positions[(2*N+i)*3+1]   = y; positions[(2*N+i)*3+2]   = zN;
     uvs[(2*N+i)*2] = u; uvs[(2*N+i)*2+1] = 0;
 
-    // far-cap ring (3N..4N-1) — isolated
+    // far-cap isolated (3N..4N-1)
     positions[(3*N+i)*3]   = x; positions[(3*N+i)*3+1]   = y; positions[(3*N+i)*3+2]   = zF;
     uvs[(3*N+i)*2] = u; uvs[(3*N+i)*2+1] = 1;
   }
@@ -146,7 +159,7 @@ export function createBoardGeometry(lengthFt) {
   const sideIndices = [];
   const capIndices  = [];
 
-  // Side wall quads (rings 0..2N-1)
+  // Side wall quads
   for (let i = 0; i < N; i++) {
     const j  = (i + 1) % N;
     const ni = i,     nj = j;
@@ -155,12 +168,15 @@ export function createBoardGeometry(lengthFt) {
     sideIndices.push(ni, fj, nj);
   }
 
-  // End cap fans (isolated rings 2N..4N-1)
+  // End caps — earcut triangles offset into isolated cap rings
   const NC = 2 * N;
   const FC = 3 * N;
-  for (let i = 1; i < N - 1; i++) {
-    capIndices.push(NC,     NC + i,     NC + i + 1); // near cap: faces -Z
-    capIndices.push(FC, FC + i + 1, FC + i);          // far  cap: faces +Z
+  for (let t = 0; t < _earcutTris.length; t += 3) {
+    const a = _earcutTris[t], b = _earcutTris[t+1], c = _earcutTris[t+2];
+    // Near cap: earcut winding faces -Z (correct as-is)
+    capIndices.push(NC + a, NC + b, NC + c);
+    // Far cap: reverse winding to face +Z
+    capIndices.push(FC + a, FC + c, FC + b);
   }
 
   const allIndices = [...sideIndices, ...capIndices];
@@ -169,8 +185,8 @@ export function createBoardGeometry(lengthFt) {
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2));
   geo.setIndex(allIndices);
-  geo.addGroup(0,                  sideIndices.length, 0); // textured sides
-  geo.addGroup(sideIndices.length, capIndices.length,  1); // solid caps
+  geo.addGroup(0,                  sideIndices.length, 0);
+  geo.addGroup(sideIndices.length, capIndices.length,  1);
   geo.computeVertexNormals();
   return geo;
 }
