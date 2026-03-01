@@ -2,202 +2,175 @@
  * TrueGrain Board Profile Geometry
  * Cross-section parsed from: Grooved-Chestnut-Decking-Wrapped.DXF
  *
- * Strategy: sweep the 75-point profile along the Z axis using a
- * BufferGeometry. Profile X = board width, profile Y = board thickness
- * (downward from top surface), board length = Z axis.
+ * Profile features (all dims in inches, converted to feet for scene units):
+ *   - Total width:  5.500" / 12 = 0.45833 ft
+ *   - Total height: 1.001" / 12 = 0.08342 ft
+ *   - Top corner radius: 0.100"
+ *   - Hidden fastener grooves on each side: 0.450" deep x 0.181" tall
+ *   - 45° chamfer transition to narrower bottom flange
  *
- * Coordinate convention (matches the rest of the codebase):
- *   - mesh.position.y = state.deckHeight + BOARD_PROFILE.thicknessFt
- *     (top surface sits at deckHeight, geometry hangs downward)
- *   - Board runs along Z by default. For X-running boards,
- *     caller sets mesh.rotation.y = Math.PI / 2.
+ * THREE is loaded globally via CDN <script> tag in index.html.
+ * Do NOT import from 'three' — use the global THREE object.
  *
- * THREE is expected as a global (loaded via <script> tag in index.html).
+ * Applied to: straight boards, breaker boards, picture frame FILL boards
+ * NOT applied to: picture frame border boards (mitered), stair treads
  *
  * @module board-profile
  */
 
-const IN = 1 / 12; // inches to feet
-
-// ── Profile dimensions ───────────────────────────────────────────────────────
-export const BOARD_PROFILE = {
-  widthFt:        5.5   * IN,   // 0.45833 ft
-  thicknessFt:    1.0   * IN,   // 0.08333 ft  (nominal top-surface height)
-  totalHeightFt:  1.001 * IN,   // 0.08342 ft  (top to bottom flange)
-  grooveDepthFt:  0.45  * IN,
-  grooveHeightFt: 0.181 * IN,
-};
-
-export const BOARD_GAP_FT   = 0.125 * IN;           // 1/8" gap
-export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
-
-// ── Raw DXF profile points (inches) ─────────────────────────────────────────
-// Traced CCW viewed from the end of the board.
-// X = width (centered at 0, ±2.75" max)
-// Y = height (0 = top surface, negative = downward into board)
-const PROFILE_IN = [
-  [-2.65,         0           ],
-  [ 2.65,         0           ],
-  [ 2.675882,    -0.003407    ],
-  [ 2.7,         -0.013397    ],
-  [ 2.720711,    -0.029289    ],
-  [ 2.736603,    -0.05        ],
-  [ 2.746593,    -0.074118    ],
-  [ 2.75,        -0.1         ],
-  [ 2.75,        -0.3595      ],
-  [ 2.746194,    -0.378634    ],
-  [ 2.735355,    -0.394855    ],
-  [ 2.719134,    -0.405694    ],
-  [ 2.7,         -0.4095      ],
-  [ 2.35,        -0.4095      ],
-  [ 2.330866,    -0.413306    ],
-  [ 2.314645,    -0.424145    ],
-  [ 2.303806,    -0.440366    ],
-  [ 2.3,         -0.4595      ],
-  [ 2.3,         -0.5405      ],
-  [ 2.303806,    -0.559634    ],
-  [ 2.314645,    -0.575855    ],
-  [ 2.330866,    -0.586694    ],
-  [ 2.35,        -0.5905      ],
-  [ 2.7,         -0.5905      ],
-  [ 2.719134,    -0.594306    ],
-  [ 2.735355,    -0.605145    ],
-  [ 2.746194,    -0.621366    ],
-  [ 2.75,        -0.6405      ],
-  [ 2.75,        -0.6829      ],
-  [ 2.749039,    -0.692688    ],
-  [ 2.746194,    -0.702068    ],
-  [ 2.741573,    -0.710712    ],
-  [ 2.735355,    -0.718289    ],
-  [ 2.467633,    -0.986012    ],
-  [ 2.460056,    -0.99223     ],
-  [ 2.451412,    -0.99685     ],
-  [ 2.442032,    -0.999696    ],
-  [ 2.432278,    -1.000656    ],
-  [-2.432278,    -1.000656    ],
-  [-2.442032,    -0.999696    ],
-  [-2.451412,    -0.99685     ],
-  [-2.460056,    -0.99223     ],
-  [-2.467633,    -0.986012    ],
-  [-2.735355,    -0.718289    ],
-  [-2.741573,    -0.710712    ],
-  [-2.746194,    -0.702068    ],
-  [-2.749039,    -0.692688    ],
-  [-2.75,        -0.6829      ],
-  [-2.75,        -0.6405      ],
-  [-2.746194,    -0.621366    ],
-  [-2.735355,    -0.605145    ],
-  [-2.719134,    -0.594306    ],
-  [-2.7,         -0.5905      ],
-  [-2.35,        -0.5905      ],
-  [-2.330866,    -0.586694    ],
-  [-2.314645,    -0.575855    ],
-  [-2.303806,    -0.559634    ],
-  [-2.3,         -0.5405      ],
-  [-2.3,         -0.4595      ],
-  [-2.303806,    -0.440366    ],
-  [-2.314645,    -0.424145    ],
-  [-2.330866,    -0.413306    ],
-  [-2.35,        -0.4095      ],
-  [-2.7,         -0.4095      ],
-  [-2.719134,    -0.405694    ],
-  [-2.735355,    -0.394855    ],
-  [-2.746194,    -0.378634    ],
-  [-2.75,        -0.3595      ],
-  [-2.75,        -0.1         ],
-  [-2.746593,    -0.074118    ],
-  [-2.736603,    -0.05        ],
-  [-2.720711,    -0.029289    ],
-  [-2.7,         -0.013397    ],
-  [-2.675882,    -0.003407    ],
-  [-2.65,         0           ],
-];
-
-// Convert to feet, close the loop
-const PROFILE_FT = PROFILE_IN.map(([x, y]) => [x * IN, y * IN]);
+// Inches to feet conversion factor
+const IN = 1 / 12;
 
 /**
- * Triangulate a closed 2-D polygon using a simple fan from centroid.
- * Returns flat array of [i0, i1, i2, ...] indices into pts.
- * Works correctly for convex polygons and reasonably well for
- * our near-convex board profile.
+ * 75-point profile traced CCW from top-left.
+ * Coordinates in inches, centered at X=0.
+ * Y=0 is approximately mid-height; top=+0.5", bottom=-0.5007"
  */
-function fanTriangulate(pts) {
-  const indices = [];
-  // Use index 0 as the fan origin
-  for (let i = 1; i < pts.length - 1; i++) {
-    indices.push(0, i, i + 1);
+const PROFILE_POINTS_IN = [
+  [-2.65,         0.5          ],
+  [ 2.65,         0.5          ],
+  [ 2.675882,     0.496593     ],
+  [ 2.7,          0.486603     ],
+  [ 2.720711,     0.470711     ],
+  [ 2.736603,     0.45         ],
+  [ 2.746593,     0.425882     ],
+  [ 2.75,         0.4          ],
+  [ 2.75,         0.1405       ],
+  [ 2.746194,     0.121366     ],
+  [ 2.735355,     0.105145     ],
+  [ 2.719134,     0.094306     ],
+  [ 2.7,          0.0905       ],
+  [ 2.35,         0.0905       ],
+  [ 2.35,         0.0905       ],
+  [ 2.330866,     0.086694     ],
+  [ 2.314645,     0.075855     ],
+  [ 2.303806,     0.059634     ],
+  [ 2.3,          0.0405       ],
+  [ 2.3,         -0.0405       ],
+  [ 2.303806,    -0.059634     ],
+  [ 2.314645,    -0.075855     ],
+  [ 2.330866,    -0.086694     ],
+  [ 2.35,        -0.0905       ],
+  [ 2.7,         -0.0905       ],
+  [ 2.719134,    -0.094306     ],
+  [ 2.735355,    -0.105145     ],
+  [ 2.746194,    -0.121366     ],
+  [ 2.75,        -0.1405       ],
+  [ 2.75,        -0.1829339828 ],
+  [ 2.749039,    -0.192688     ],
+  [ 2.746194,    -0.202068     ],
+  [ 2.741573,    -0.210712     ],
+  [ 2.735355,    -0.218289     ],
+  [ 2.4676330114,-0.4860116495 ],
+  [ 2.460056,    -0.49223      ],
+  [ 2.451412,    -0.49685      ],
+  [ 2.442032,    -0.499696     ],
+  [ 2.432278,    -0.500656     ],
+  [-2.432278,    -0.500656     ],
+  [-2.442032,    -0.499696     ],
+  [-2.451412,    -0.49685      ],
+  [-2.460056,    -0.49223      ],
+  [-2.467633,    -0.486012     ],
+  [-2.7353553391,-0.2182893219 ],
+  [-2.741573,    -0.210712     ],
+  [-2.746194,    -0.202068     ],
+  [-2.749039,    -0.192688     ],
+  [-2.75,        -0.182934     ],
+  [-2.75,        -0.1405       ],
+  [-2.746194,    -0.121366     ],
+  [-2.735355,    -0.105145     ],
+  [-2.719134,    -0.094306     ],
+  [-2.7,         -0.0905       ],
+  [-2.35,        -0.0905       ],
+  [-2.330866,    -0.086694     ],
+  [-2.314645,    -0.075855     ],
+  [-2.303806,    -0.059634     ],
+  [-2.3,         -0.0405       ],
+  [-2.3,          0.0405       ],
+  [-2.303806,     0.059634     ],
+  [-2.314645,     0.075855     ],
+  [-2.330866,     0.086694     ],
+  [-2.35,         0.0905       ],
+  [-2.7,          0.0905       ],
+  [-2.719134,     0.094306     ],
+  [-2.735355,     0.105145     ],
+  [-2.746194,     0.121366     ],
+  [-2.75,         0.1405       ],
+  [-2.75,         0.4          ],
+  [-2.746593,     0.425882     ],
+  [-2.736603,     0.45         ],
+  [-2.720711,     0.470711     ],
+  [-2.7,          0.486603     ],
+  [-2.675882,     0.496593     ],
+  [-2.65,         0.5          ],
+];
+
+/**
+ * Build the THREE.Shape for the board cross-section.
+ * Scales each point from inches to feet (÷12) for scene units.
+ * Uses global THREE (loaded via CDN).
+ * @returns {THREE.Shape}
+ */
+function buildBoardProfileShape() {
+  const shape = new THREE.Shape();
+  const [sx, sy] = PROFILE_POINTS_IN[0];
+  shape.moveTo(sx * IN, sy * IN);
+  for (let i = 1; i < PROFILE_POINTS_IN.length; i++) {
+    const [x, y] = PROFILE_POINTS_IN[i];
+    shape.lineTo(x * IN, y * IN);
   }
-  return indices;
+  shape.closePath();
+  return shape;
 }
 
 /**
- * Build a THREE.BufferGeometry for one board.
+ * Create an extruded board geometry from the DXF cross-section profile.
  *
- * The geometry is built with:
- *   - width along X  (±2.75" / 12)
- *   - thickness along Y  (0 at top, negative downward)
- *   - length along Z  (-halfLen to +halfLen)
+ * The shape sits in the XY plane and is extruded along +Z (board length).
+ * After creation the geometry is translated so that:
+ *   - X is centered at 0 (board width centered)
+ *   - Y=0 is the TOP surface of the board (so mesh.position.y = deckHeight)
+ *   - Z is centered at 0 (board length centered)
  *
- * Place the mesh at:
- *   mesh.position.y = state.deckHeight + BOARD_PROFILE.thicknessFt
+ * Rotate the mesh 90° around Y if the board runs along X instead of Z.
  *
- * For boards running along the deck LENGTH axis (X), set:
- *   mesh.rotation.y = Math.PI / 2
- * For boards running along the deck WIDTH axis (Z), no rotation.
- *
- * @param {number} lengthFt
- * @returns {THREE.BufferGeometry}
+ * @param {number} lengthFt - Board length in feet
+ * @returns {THREE.ExtrudeGeometry}
  */
 export function createBoardGeometry(lengthFt) {
-  const n   = PROFILE_FT.length;
-  const zN  = -lengthFt / 2;  // near end
-  const zF  =  lengthFt / 2;  // far end
+  const shape = buildBoardProfileShape();
 
-  // Build positions: near-cap verts (z=zN) then far-cap verts (z=zF)
-  const positions = [];
-  for (const [x, y] of PROFILE_FT) positions.push(x, y, zN);
-  for (const [x, y] of PROFILE_FT) positions.push(x, y, zF);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    steps:        1,
+    depth:        lengthFt,
+    bevelEnabled: false,
+  });
 
-  const indices = [];
-
-  // ── End caps ────────────────────────────────────────────────────────────
-  const nearFan = fanTriangulate(PROFILE_FT);
-  // Near cap: CCW when looking from -Z  → reverse winding for correct normals
-  for (let i = 0; i < nearFan.length; i += 3) {
-    indices.push(nearFan[i], nearFan[i + 2], nearFan[i + 1]);
-  }
-  // Far cap: CCW when looking from +Z
-  for (let i = 0; i < nearFan.length; i += 3) {
-    indices.push(n + nearFan[i], n + nearFan[i + 1], n + nearFan[i + 2]);
-  }
-
-  // ── Side quads ──────────────────────────────────────────────────────────
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    // quad: nearI, nearJ, farJ, farI
-    const ni = i, nj = j;
-    const fi = n + i, fj = n + j;
-    indices.push(ni, fj, fi);   // tri 1
-    indices.push(ni, nj, fj);   // tri 2
-  }
-
-  // ── UVs ─────────────────────────────────────────────────────────────────
-  // Top face is the side quad running along Z between the two topmost
-  // profile points (index 0 and n-1, both at y=0).
-  // We assign UV u = (x + halfWidth) / width, v = z / length + 0.5
-  // for all vertices so the texture stretches over the full top face.
-  const halfW = BOARD_PROFILE.widthFt / 2;
-  const uvs = [];
-  for (const [x] of PROFILE_FT) uvs.push((x + halfW) / BOARD_PROFILE.widthFt, 0);
-  for (const [x] of PROFILE_FT) uvs.push((x + halfW) / BOARD_PROFILE.widthFt, 1);
-
-  // ── Assemble ─────────────────────────────────────────────────────────────
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-  geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(uvs), 2));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
+  // Shift so Y=0 is the top surface and board is centered on X and Z.
+  // Profile top is at +0.5" = 0.5*IN ft — shift down by that amount.
+  geo.translate(0, -0.5 * IN, -lengthFt / 2);
 
   return geo;
 }
+
+/**
+ * Board profile constants (in feet) for layout and positioning math.
+ */
+export const BOARD_PROFILE = {
+  widthFt:        5.5   * IN,   // 0.45833 ft
+  thicknessFt:    1.0   * IN,   // 0.08333 ft  (top surface nominal)
+  totalHeightFt:  1.001 * IN,   // 0.08342 ft  (top to bottom flange)
+  grooveDepthFt:  0.45  * IN,   // hidden clip channel depth from side
+  grooveHeightFt: 0.181 * IN,   // hidden clip channel height
+};
+
+/**
+ * Install gap between adjacent board faces: 1/8" = 0.125"
+ * Matches CONFIG.boards.gap
+ */
+export const BOARD_GAP_FT = 0.125 * IN;
+
+/**
+ * Center-to-center board pitch for layout loops.
+ */
+export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
