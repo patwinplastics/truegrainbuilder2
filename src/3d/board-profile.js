@@ -3,10 +3,9 @@
  * Cross-section parsed from: Grooved-Chestnut-Decking-Wrapped.DXF
  *
  * Geometry strategy: manual BufferGeometry sweep.
- * The 75 profile points define the cross-section in the XZ plane:
  *   profile X  -> world X  (board width, centered at 0)
  *   profile Y  -> world Y  (depth, 0 = top surface, negative = downward)
- * The profile is swept along world Z (board length).
+ * Swept along world Z (board length).
  *
  * Place mesh at:  mesh.position.y = state.deckHeight + BOARD_PROFILE.thicknessFt
  * For X-running:  mesh.rotation.y = Math.PI / 2
@@ -19,7 +18,6 @@
 
 const IN = 1 / 12;
 
-// ── Profile constants ────────────────────────────────────────────────────────
 export const BOARD_PROFILE = {
   widthFt:        5.5   * IN,
   thicknessFt:    1.0   * IN,
@@ -31,9 +29,9 @@ export const BOARD_PROFILE = {
 export const BOARD_GAP_FT   = 0.125 * IN;
 export const BOARD_PITCH_FT = BOARD_PROFILE.widthFt + BOARD_GAP_FT;
 
-// ── DXF profile points (inches) ──────────────────────────────────────────────
-// X = board width (centered at 0, ±2.75" max)
-// Y = 0 at top surface, negative = downward into board
+// Profile points in inches.
+// X = board width (centered at 0), Y = 0 at top, negative downward.
+// Points trace CW when viewed from the near end (-Z direction).
 const PROFILE_IN = [
   [-2.65,         0           ],
   [ 2.65,         0           ],
@@ -116,57 +114,45 @@ const PROFILE_FT = PROFILE_IN.map(([x, y]) => [x * IN, y * IN]);
 const N = PROFILE_FT.length;
 const HALF_W = BOARD_PROFILE.widthFt / 2;
 
-/**
- * Build a BufferGeometry for one board by sweeping the DXF profile along Z.
- *
- * @param {number} lengthFt
- * @returns {THREE.BufferGeometry}
- */
 export function createBoardGeometry(lengthFt) {
   const zN = -lengthFt / 2;
   const zF =  lengthFt / 2;
 
-  // ── Positions: near ring (z=zN) then far ring (z=zF) ──────────────────────
+  // Positions: indices 0..N-1 = near ring (zN), N..2N-1 = far ring (zF)
   const positions = new Float32Array(N * 2 * 3);
   for (let i = 0; i < N; i++) {
     const [x, y] = PROFILE_FT[i];
-    positions[i * 3]     = x;  positions[i * 3 + 1] = y;  positions[i * 3 + 2] = zN;
-    positions[(N + i) * 3]     = x;
-    positions[(N + i) * 3 + 1] = y;
-    positions[(N + i) * 3 + 2] = zF;
+    positions[i * 3]         = x;  positions[i * 3 + 1]         = y;  positions[i * 3 + 2]         = zN;
+    positions[(N + i) * 3]   = x;  positions[(N + i) * 3 + 1]   = y;  positions[(N + i) * 3 + 2]   = zF;
   }
 
-  // ── UVs: top-down planar projection ────────────────────────────────────────
-  // U = x across board width (0..1), V = z along board length (0..1)
-  // Matches BoxGeometry top-face UV convention so materials.js tex.rotation works.
+  // UVs: U = x across width (0..1), V = 0 at near end, 1 at far end
   const uvs = new Float32Array(N * 2 * 2);
   for (let i = 0; i < N; i++) {
-    const [x] = PROFILE_FT[i];
-    const u = (x + HALF_W) / BOARD_PROFILE.widthFt;
-    uvs[i * 2]         = u;  uvs[i * 2 + 1]         = 0; // near end V=0
-    uvs[(N + i) * 2]   = u;  uvs[(N + i) * 2 + 1]   = 1; // far  end V=1
+    const u = (PROFILE_FT[i][0] + HALF_W) / BOARD_PROFILE.widthFt;
+    uvs[i * 2]       = u;  uvs[i * 2 + 1]       = 0;
+    uvs[(N+i) * 2]   = u;  uvs[(N+i) * 2 + 1]   = 1;
   }
 
-  // ── Indices ─────────────────────────────────────────────────────────────────
-  const maxTris = (N - 2) * 2 + N * 2; // end caps + side quads
   const indices = [];
 
-  // End caps — fan triangulation from vertex 0
+  // End caps — fan from vertex 0
+  // Profile traces CW from -Z viewpoint, so near cap uses same order (front-facing -Z)
+  // Far cap reverses winding so it faces +Z
   for (let i = 1; i < N - 1; i++) {
-    indices.push(0, i + 1, i);         // near cap (CW from +Z = correct outward normal)
-    indices.push(N, N + i, N + i + 1); // far  cap (CCW from +Z)
+    indices.push(0,     i,     i + 1);      // near cap: faces -Z
+    indices.push(N, N + i + 1, N + i);      // far  cap: faces +Z (reversed)
   }
 
-  // Side quads — one quad per profile edge
+  // Side wall quads — one per profile edge, connecting near ring to far ring
   for (let i = 0; i < N; i++) {
     const j  = (i + 1) % N;
     const ni = i,     nj = j;
     const fi = N + i, fj = N + j;
-    indices.push(ni, fi, fj);  // tri 1
-    indices.push(ni, fj, nj);  // tri 2
+    indices.push(ni, fi, fj);
+    indices.push(ni, fj, nj);
   }
 
-  // ── Assemble ─────────────────────────────────────────────────────────────────
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2));
