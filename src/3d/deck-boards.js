@@ -12,6 +12,13 @@ function dims() {
     return { bw, bt, g, ew: bw + g };
 }
 
+// Compute length segments so each sub-quad is roughly square.
+// This eliminates the diagonal texture interpolation seam that
+// appears when a long rectangle is split into only 2 triangles.
+function boardSegs(lengthFt, widthFt) {
+    return Math.max(1, Math.ceil(lengthFt / widthFt));
+}
+
 export function createDeckBoardsWithSegments(deckGroup, state, pattern, colorConfig) {
     if (!state.boardLayout) return;
     if      (pattern.type === 'picture-frame') createPictureFrameBoards(deckGroup, state, colorConfig);
@@ -32,8 +39,13 @@ function createStraightBoards(deckGroup, state, colorConfig) {
         let ro = -run / 2;
         segments.forEach((seg, si) => {
             const sl  = seg.actualLength || seg.length;
+            const segs = boardSegs(sl, bw);
             const mat = createBoardMaterial(colorConfig, sl, !isLen, `s${row}_${si}`);
-            const m   = new THREE.Mesh(new THREE.BoxGeometry(isLen ? sl : bw, bt, isLen ? bw : sl), mat);
+            const m   = new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    isLen ? sl : bw, bt, isLen ? bw : sl,
+                    isLen ? segs : 1, 1, isLen ? 1 : segs
+                ), mat);
             m.position.set(isLen ? ro + sl / 2 : co, boardY, isLen ? co : ro + sl / 2);
             m.castShadow = m.receiveShadow = true;
             deckGroup.add(m);
@@ -130,32 +142,28 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         const mat = createBoardMaterial(bColor, dL, true, `bframe${i}`);
 
         // FRONT: runs along X, narrow in Z
-        // x spans full length (-L0 to L0), z spans one board width (-W0 to -W1)
         deckGroup.add(buildMiteredMesh(
             [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
             yBot, yTop, -L0, L0, -W0, -W1, true, mat
         ));
         // BACK: runs along X, narrow in Z
-        // x spans full length (-L0 to L0), z spans one board width (W1 to W0)
         deckGroup.add(buildMiteredMesh(
             [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
             yBot, yTop, -L0, L0, W1, W0, true, mat
         ));
         // LEFT: runs along Z, narrow in X
-        // x spans one board width (-L0 to -L1), z spans full width (-W0 to W0)
         deckGroup.add(buildMiteredMesh(
             [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
             yBot, yTop, -L0, -L1, -W0, W0, false, mat
         ));
         // RIGHT: runs along Z, narrow in X
-        // x spans one board width (L1 to L0), z spans full width (-W0 to W0)
         deckGroup.add(buildMiteredMesh(
             [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
             yBot, yTop, L1, L0, -W0, W0, false, mat
         ));
     }
 
-    // Fill boards
+    // Fill boards (subdivided along length)
     const isLen  = state.boardDirection === 'length';
     const bwFt   = bc * ew;
     const iLen   = dL - 2 * bwFt;
@@ -163,11 +171,15 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const run    = isLen ? iLen : iWid;
     const cov    = isLen ? iWid : iLen;
     const nRows  = Math.ceil(cov / ew);
+    const fillSegs = boardSegs(run, bw);
     for (let r = 0; r < nRows; r++) {
         const co  = (r * ew) - cov / 2 + bw / 2;
         const mat = createBoardMaterial(colorConfig, run, !isLen, `pf${r}`);
         const m   = new THREE.Mesh(
-            new THREE.BoxGeometry(isLen ? run : bw, bt, isLen ? bw : run), mat);
+            new THREE.BoxGeometry(
+                isLen ? run : bw, bt, isLen ? bw : run,
+                isLen ? fillSegs : 1, 1, isLen ? 1 : fillSegs
+            ), mat);
         m.position.set(isLen ? 0 : co, state.deckHeight + bt / 2, isLen ? co : 0);
         m.castShadow = m.receiveShadow = true;
         deckGroup.add(m);
@@ -185,8 +197,12 @@ function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
         : (CONFIG.colors.find(c => c.id === state.breakerColor) || colorConfig);
     const { runDimension: run, coverDimension: cov, numRows } = state.boardLayout;
     const bp = pattern.breakerPosition || run / 2;
+    const brkSegs = boardSegs(cov, bw);
     const br = new THREE.Mesh(
-        new THREE.BoxGeometry(isLen ? bw : cov, bt, isLen ? cov : bw),
+        new THREE.BoxGeometry(
+            isLen ? bw : cov, bt, isLen ? cov : bw,
+            isLen ? 1 : brkSegs, 1, isLen ? brkSegs : 1
+        ),
         createBoardMaterial(bColor, cov, isLen, 'breaker')
     );
     br.position.set(isLen ? bp - run / 2 : 0, boardY, isLen ? 0 : bp - run / 2);
@@ -196,8 +212,12 @@ function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
         const co = (row * ew) - cov / 2 + bw / 2;
         [[s1, -run / 2 + s1 / 2], [s2, run / 2 - s2 / 2]].forEach(([sl, ctr], si) => {
             if (sl <= 0) return;
+            const segs = boardSegs(sl, bw);
             const m = new THREE.Mesh(
-                new THREE.BoxGeometry(isLen ? sl : bw, bt, isLen ? bw : sl),
+                new THREE.BoxGeometry(
+                    isLen ? sl : bw, bt, isLen ? bw : sl,
+                    isLen ? segs : 1, 1, isLen ? 1 : segs
+                ),
                 createBoardMaterial(colorConfig, sl, !isLen, `bk${si}_${row}`)
             );
             m.position.set(isLen ? ctr : co, boardY, isLen ? co : ctr);
