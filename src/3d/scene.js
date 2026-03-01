@@ -1,5 +1,6 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Three.js Scene Manager
+// Ultra-Realistic Rendering Edition
 // ============================================================
 import { CONFIG }                                             from '../config.js';
 import { state }                                              from '../state.js';
@@ -19,16 +20,95 @@ import {
     isWalkthroughActive
 } from './walkthrough.js';
 
-let scene, camera, renderer, controls;
+let scene, camera, renderer, controls, composer;
 let deckGroup        = null;
 let sceneInitialized = false;
 let isBuilding       = false;
 let pendingBuild     = false;
 let contextLost      = false;
+let envMapLoaded     = false;
 
 export const getScene    = () => scene;
 export const getCamera   = () => camera;
 export const getRenderer = () => renderer;
+
+// ============================================================
+// HDRI Environment Loader
+// Falls back to a synthetic PMREMGenerator sky if no .hdr file
+// is found, so the app never breaks without the asset.
+// ============================================================
+function loadEnvironment() {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+
+    const hdriPath = CONFIG.hdriPath || 'hdri/outdoor_midday.hdr';
+
+    // Try RGBELoader if available (loaded via CDN in index.html)
+    if (typeof THREE.RGBELoader !== 'undefined') {
+        new THREE.RGBELoader()
+            .load(
+                hdriPath,
+                (hdrTex) => {
+                    const envMap = pmrem.fromEquirectangular(hdrTex).texture;
+                    scene.environment = envMap;
+                    scene.background  = envMap;
+                    hdrTex.dispose();
+                    pmrem.dispose();
+                    envMapLoaded = true;
+                },
+                undefined,
+                () => {
+                    // HDRI not found — use fallback procedural sky
+                    console.info('HDRI not found, using procedural sky fallback.');
+                    _applyFallbackSky(pmrem);
+                }
+            );
+    } else {
+        _applyFallbackSky(pmrem);
+    }
+}
+
+/**
+ * Fallback: build a simple gradient environment map from a
+ * CubeRenderTarget so PBR materials still have something to
+ * reflect when no HDRI asset is present.
+ */
+function _applyFallbackSky(pmrem) {
+    // Use a lightweight sky-blue + ground-tan gradient
+    const skyScene  = new THREE.Scene();
+    skyScene.background = new THREE.Color(0x87CEEB);
+    const cubeRT = pmrem.fromScene(new THREE.RoomEnvironment());
+    scene.environment = cubeRT.texture;
+    scene.background  = new THREE.Color(0x87CEEB);
+    pmrem.dispose();
+}
+
+// ============================================================
+// Post-Processing (SSAO)
+// Loaded lazily — if EffectComposer CDN is absent, we skip
+// ============================================================
+function setupPostProcessing() {
+    if (typeof THREE.EffectComposer === 'undefined' ||
+        typeof THREE.RenderPass     === 'undefined' ||
+        typeof THREE.SSAOPass       === 'undefined') {
+        console.info('Post-processing scripts not detected — skipping SSAO.');
+        composer = null;
+        return;
+    }
+
+    const container = document.getElementById('sceneContainer');
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+
+    const ssao = new THREE.SSAOPass(scene, camera, w, h);
+    ssao.kernelRadius = 10;
+    ssao.minDistance  = 0.001;
+    ssao.maxDistance  = 0.12;
+    composer.addPass(ssao);
+}
 
 // ============================================================
 // initScene — deferred until container has real dimensions
@@ -56,44 +136,71 @@ export function initScene() {
     });
 
     scene = new THREE.Scene();
+    // Background overridden by HDRI after load; set placeholder
     scene.background = new THREE.Color(0x87CEEB);
+
+    // Subtle atmospheric fog — adds depth to long deck views
+    scene.fog = new THREE.FogExp2(0xC8DCF0, 0.008);
 
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.set(25, 20, 25);
 
     renderer = new THREE.WebGLRenderer({
         canvas,
-        antialias: true,
+        antialias:            true,
         preserveDrawingBuffer: true,
-        powerPreference: 'high-performance'
+        powerPreference:      'high-performance'
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Allow up to device native pixel ratio for sharp rendering on Retina screens
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
 
-    // Enable max anisotropic filtering for wood textures
+    // ── Physically correct tone mapping ──────────────────────
+    renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.outputColorSpace    = THREE.SRGBColorSpace;
+
+    // ── Shadows — VSM for smooth soft edges ──────────────────
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type    = THREE.VSMShadowMap;
+
     setMaxAnisotropy(renderer);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping  = true;
-    controls.dampingFactor  = 0.05;
-    controls.minPolarAngle  = 0;
-    controls.maxPolarAngle  = Math.PI * 0.9;
-    controls.minDistance    = 5;
-    controls.maxDistance    = 150;
-    controls.enablePan      = true;
-    controls.enableZoom     = true;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI * 0.9;
+    controls.minDistance   = 5;
+    controls.maxDistance   = 150;
+    controls.enablePan     = true;
+    controls.enableZoom    = true;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(20, 30, 20);
+    // ── Lighting ─────────────────────────────────────────────
+    // Keep a low ambient so shadows aren't pure black before HDRI loads
+    const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+    scene.add(ambient);
+
+    // Primary sun — warm afternoon angle
+    const sun = new THREE.DirectionalLight(0xFFF5E0, 2.2);
+    sun.position.set(30, 40, 20);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = sun.shadow.mapSize.height = 2048;
-    sun.shadow.bias       = -0.001;
+    sun.shadow.mapSize.width  = 4096;
+    sun.shadow.mapSize.height = 4096;
+    sun.shadow.bias       = -0.0005;
     sun.shadow.normalBias =  0.02;
-    Object.assign(sun.shadow.camera, { near: 0.5, far: 100, left: -40, right: 40, top: 40, bottom: -40 });
+    // Shadow camera is tightened dynamically in executeBuildDeck()
+    Object.assign(sun.shadow.camera, { near: 0.5, far: 120, left: -50, right: 50, top: 50, bottom: -50 });
     scene.add(sun);
+    scene.userData.sun = sun; // stored for dynamic frustum updates
+
+    // Soft fill from the opposite side (simulates sky bounce)
+    const fill = new THREE.DirectionalLight(0xB0CCE8, 0.6);
+    fill.position.set(-20, 15, -15);
+    scene.add(fill);
+
+    // ── HDRI Environment ────────────────────────────────────
+    loadEnvironment();
 
     createRealisticGrass(scene);
 
@@ -101,20 +208,25 @@ export function initScene() {
     scene.add(deckGroup);
 
     sceneInitialized = true;
+    preloadTextures();
     buildDeck();
     document.getElementById('sceneLoading')?.classList.add('hidden');
+
+    // ── Post-processing ──────────────────────────────────────
+    setupPostProcessing();
+
     animate();
 
-    // Init walkthrough module now that camera/renderer/controls exist
     initWalkthrough(camera, renderer, controls);
-
-    // Wire the Walk button (may already be in DOM)
     _bindWalkButton();
 
     window.addEventListener('resize', debounce(onWindowResize, 250));
     window.addEventListener('beforeunload', disposeAllCaches);
 }
 
+// ============================================================
+// Render loop
+// ============================================================
 function animate() {
     if (contextLost) return;
     requestAnimationFrame(animate);
@@ -123,17 +235,29 @@ function animate() {
     } else {
         controls?.update();
     }
-    if (renderer && scene && camera) renderer.render(scene, camera);
+    if (renderer && scene && camera) {
+        if (composer) {
+            composer.render();
+        } else {
+            renderer.render(scene, camera);
+        }
+    }
 }
 
 function onWindowResize() {
     const c = document.getElementById('sceneContainer');
     if (!c || !camera || !renderer) return;
-    camera.aspect = c.clientWidth / c.clientHeight;
+    const w = c.clientWidth;
+    const h = c.clientHeight;
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(c.clientWidth, c.clientHeight);
+    renderer.setSize(w, h);
+    composer?.setSize(w, h);
 }
 
+// ============================================================
+// Deck build
+// ============================================================
 const debouncedBuild = debounce(() => {
     if (isBuilding) { pendingBuild = true; return; }
     executeBuildDeck();
@@ -143,9 +267,7 @@ export function buildDeck() { debouncedBuild(); }
 
 function disposeGroupChildren(group) {
     group.traverse(child => {
-        if (child.isMesh) {
-            child.geometry?.dispose();
-        }
+        if (child.isMesh) child.geometry?.dispose();
     });
     while (group.children.length > 0) group.remove(group.children[0]);
 }
@@ -163,16 +285,28 @@ function executeBuildDeck() {
         createJoists(deckGroup, state);
         createDeckBoardsWithSegments(deckGroup, state, determinePattern(state), colorConfig);
         createWhiteFascia(deckGroup, state);
-        if (state.showRailings)                               createDetailedRailings(deckGroup, state);
-        if (state.stairsEnabled && state.stairs?.length > 0)  createAllStairs(deckGroup, state);
+        if (state.showRailings)                              createDetailedRailings(deckGroup, state);
+        if (state.stairsEnabled && state.stairs?.length > 0) createAllStairs(deckGroup, state);
+
+        // Tighten sun shadow frustum to deck bounds for maximum shadow resolution
+        const sun = scene?.userData.sun;
+        if (sun) {
+            const pad  = 6;
+            const halfL = state.deckLength / 2 + pad;
+            const halfW = state.deckWidth  / 2 + pad;
+            Object.assign(sun.shadow.camera, {
+                left: -halfL, right: halfL,
+                top:   halfW, bottom: -halfW,
+                near: 0.5,    far: state.deckHeight + 60
+            });
+            sun.shadow.camera.updateProjectionMatrix();
+        }
 
         controls.target.set(0, state.deckHeight / 2, 0);
         const m = Math.max(state.deckLength, state.deckWidth);
         camera.position.set(m * 1.4, state.deckHeight + m * 0.9, m * 1.4);
         controls.update();
         updateBoardLegend();
-
-        // Refresh walkable surface map after every deck rebuild
         refreshWalkthroughSurfaces();
     } catch (e) {
         console.error('Error building deck:', e);
@@ -206,7 +340,6 @@ export function zoomCamera(factor) {
 // ============================================================
 // Walk button wiring
 // ============================================================
-
 function _bindWalkButton() {
     const btn = document.getElementById('walkBtn');
     if (!btn) return;
@@ -215,9 +348,7 @@ function _bindWalkButton() {
             exitWalkthrough();
         } else {
             const ok = enterWalkthrough();
-            if (!ok) {
-                alert('Walkthrough requires PointerLockControls. Please ensure the CDN script is loaded.');
-            }
+            if (!ok) alert('Walkthrough requires PointerLockControls. Please ensure the CDN script is loaded.');
         }
     });
 }

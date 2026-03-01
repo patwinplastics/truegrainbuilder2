@@ -1,5 +1,6 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Material & Texture Library
+// Ultra-Realistic PBR Edition
 // ============================================================
 import { CONFIG } from '../config.js';
 
@@ -7,8 +8,13 @@ export const textureCache  = {};
 export const materialCache = {};
 export const geometryCache = {};
 
-const MAX_TEXTURE_SIZE = 1024;
+// Raised from 1024 — 2K gives visible grain detail on close inspection
+const MAX_TEXTURE_SIZE = 2048;
 let maxAniso = 1;
+
+// ============================================================
+// Internal helpers
+// ============================================================
 
 function downsampleTexture(texture, maxSize) {
     if (!maxSize) maxSize = MAX_TEXTURE_SIZE;
@@ -16,7 +22,7 @@ function downsampleTexture(texture, maxSize) {
     if (!image || (image.width <= maxSize && image.height <= maxSize)) return texture;
 
     const scale = maxSize / Math.max(image.width, image.height);
-    const w = Math.round(image.width * scale);
+    const w = Math.round(image.width  * scale);
     const h = Math.round(image.height * scale);
 
     const canvas = document.createElement('canvas');
@@ -29,45 +35,82 @@ function downsampleTexture(texture, maxSize) {
 
     texture.image = canvas;
     texture.needsUpdate = true;
-    console.info(`Downsampled texture from ${image.width}x${image.height} to ${w}x${h}`);
     return texture;
 }
 
-export function preloadTextures() {
+/**
+ * Load a texture with standard PBR defaults.
+ * colorSpace: pass THREE.SRGBColorSpace for diffuse maps, leave undefined for
+ *             data maps (normal, roughness, AO) which must stay linear.
+ */
+function loadTex(file, colorSpace) {
     const loader = new THREE.TextureLoader();
+    const tex = loader.load(
+        file,
+        (t) => {
+            downsampleTexture(t, MAX_TEXTURE_SIZE);
+            t.anisotropy  = maxAniso;
+            t.needsUpdate = true;
+        },
+        undefined,
+        () => console.warn(`Texture load failed: ${file}`)
+    );
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    if (colorSpace) tex.colorSpace = colorSpace;
+    return tex;
+}
+
+// ============================================================
+// Public API
+// ============================================================
+
+export function preloadTextures() {
     CONFIG.colors.forEach(color => {
         if (textureCache[color.id]) return;
-        loader.load(
-            CONFIG.texturePath + color.file,
-            tex => {
-                downsampleTexture(tex, MAX_TEXTURE_SIZE);
-                tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-                tex.anisotropy = maxAniso;
-                textureCache[color.id] = tex;
-            },
-            undefined,
-            () => console.warn(`Texture load failed: ${color.file}`)
-        );
+        const path = CONFIG.texturePath;
+        textureCache[color.id] = {
+            diffuse:   loadTex(path + color.file,         THREE.SRGBColorSpace),
+            normal:    color.normalFile    ? loadTex(path + color.normalFile)    : null,
+            roughness: color.roughnessFile ? loadTex(path + color.roughnessFile) : null,
+            ao:        color.aoFile        ? loadTex(path + color.aoFile)        : null,
+        };
     });
 }
 
 export function setMaxAnisotropy(renderer) {
     maxAniso = renderer.capabilities.getMaxAnisotropy?.() || 1;
-    Object.values(textureCache).forEach(t => { t.anisotropy = maxAniso; t.needsUpdate = true; });
+    // Apply to all already-loaded textures
+    Object.values(textureCache).forEach(bundle => {
+        if (!bundle || typeof bundle !== 'object') return;
+        Object.values(bundle).forEach(t => {
+            if (t && t.isTexture) { t.anisotropy = maxAniso; t.needsUpdate = true; }
+        });
+    });
 }
 
 export function disposeAllCaches() {
     Object.keys(geometryCache).forEach(k => { geometryCache[k]?.dispose(); delete geometryCache[k]; });
     Object.keys(materialCache).forEach(k => {
-        if (materialCache[k]) { materialCache[k].map?.dispose(); materialCache[k].dispose(); }
+        if (materialCache[k]) {
+            const m = materialCache[k];
+            ['map','normalMap','roughnessMap','aoMap','displacementMap'].forEach(ch => m[ch]?.dispose());
+            m.dispose();
+        }
         delete materialCache[k];
     });
-    Object.keys(textureCache).forEach(k => { textureCache[k]?.dispose(); delete textureCache[k]; });
+    Object.keys(textureCache).forEach(k => {
+        const bundle = textureCache[k];
+        if (bundle && typeof bundle === 'object') {
+            Object.values(bundle).forEach(t => t?.dispose?.());
+        }
+        delete textureCache[k];
+    });
 }
 
 /**
- * Create (or return cached) textured board material for side walls / top face.
- * boardRunsAlongWidth=true means no texture rotation (BufferGeometry V = board length).
+ * Create (or return cached) full-PBR board material.
+ * Uses diffuse + normal + roughness + AO maps when available,
+ * gracefully falls back to color-only when PBR maps are absent.
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
     const rotation = boardRunsAlongWidth ? 0 : Math.PI / 2;
@@ -76,34 +119,61 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 
     const mat = new THREE.MeshStandardMaterial({
         color:     new THREE.Color(colorConfig.hex),
-        roughness: 0.75,
-        metalness: 0.0
+        roughness: 0.85,    // overridden by roughnessMap when present
+        metalness: 0.0,
+        envMapIntensity: 0.6,
     });
 
-    const applyTex = (src) => {
-        const tex = src.clone();
-        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-        tex.anisotropy = maxAniso;
-        tex.repeat.set(1, 1);
-        tex.offset.set(0, 0);
-        tex.center.set(0.5, 0.5);
-        tex.rotation = rotation;
-        tex.needsUpdate = true;
-        mat.map = tex;
-        mat.color.setHex(0xFFFFFF);
+    const applyBundle = (bundle) => {
+        const applyTex = (src, channel, colorSpace) => {
+            if (!src) return;
+            const tex = src.clone ? src.clone() : src;
+            tex.wrapS    = tex.wrapT = THREE.RepeatWrapping;
+            tex.anisotropy = maxAniso;
+            // Boards are narrow (~5.5") — tile the texture every board-width
+            tex.repeat.set(1, 1);
+            tex.center.set(0.5, 0.5);
+            tex.rotation  = rotation;
+            if (colorSpace) tex.colorSpace = colorSpace;
+            tex.needsUpdate = true;
+            return tex;
+        };
+
+        if (bundle.diffuse) {
+            mat.map   = applyTex(bundle.diffuse, 'map', THREE.SRGBColorSpace);
+            mat.color.setHex(0xFFFFFF); // let texture drive color
+        }
+        if (bundle.normal) {
+            mat.normalMap   = applyTex(bundle.normal);
+            mat.normalScale = new THREE.Vector2(1.2, 1.2);
+        }
+        if (bundle.roughness) {
+            mat.roughnessMap = applyTex(bundle.roughness);
+            mat.roughness    = 1.0; // fully driven by map
+        }
+        if (bundle.ao) {
+            mat.aoMap          = applyTex(bundle.ao);
+            mat.aoMapIntensity = 1.0;
+        }
         mat.needsUpdate = true;
     };
 
+    // Use cached bundle if available, otherwise load on-demand
     if (textureCache[colorConfig.id]) {
-        applyTex(textureCache[colorConfig.id]);
+        applyBundle(textureCache[colorConfig.id]);
     } else {
-        new THREE.TextureLoader().load(CONFIG.texturePath + colorConfig.file, src => {
-            downsampleTexture(src, MAX_TEXTURE_SIZE);
-            src.wrapS = src.wrapT = THREE.ClampToEdgeWrapping;
-            src.anisotropy = maxAniso;
-            textureCache[colorConfig.id] = src;
-            applyTex(src);
-        });
+        // Lazy-load diffuse only (PBR maps loaded via preloadTextures)
+        const path = CONFIG.texturePath;
+        const bundle = {
+            diffuse:   loadTex(path + colorConfig.file,         THREE.SRGBColorSpace),
+            normal:    colorConfig.normalFile    ? loadTex(path + colorConfig.normalFile)    : null,
+            roughness: colorConfig.roughnessFile ? loadTex(path + colorConfig.roughnessFile) : null,
+            ao:        colorConfig.aoFile        ? loadTex(path + colorConfig.aoFile)        : null,
+        };
+        textureCache[colorConfig.id] = bundle;
+        // Apply after diffuse loads (others may be null/loading)
+        bundle.diffuse.addEventListener?.('loaded', () => applyBundle(bundle));
+        applyBundle(bundle); // also apply synchronously for any already-resolved textures
     }
 
     materialCache[key] = mat;
@@ -111,16 +181,17 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 }
 
 /**
- * Create (or return cached) solid-color material for board end caps.
- * No texture — just the flat cut-face color of the composite board.
+ * Create (or return cached) solid-color end-cap material.
+ * Slightly darker and more matte than face to simulate a cut composite edge.
  */
 export function createCapMaterial(colorConfig) {
     const key = `cap_${colorConfig.id}`;
     if (materialCache[key]) return materialCache[key];
     const mat = new THREE.MeshStandardMaterial({
-        color:     new THREE.Color(colorConfig.hex),
-        roughness: 0.85,
+        color:     new THREE.Color(colorConfig.hex).multiplyScalar(0.82),
+        roughness: 0.92,
         metalness: 0.0,
+        envMapIntensity: 0.2,
     });
     materialCache[key] = mat;
     return mat;
