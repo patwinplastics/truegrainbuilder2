@@ -10,9 +10,9 @@
     <link rel="stylesheet" href="main.css">
     <link rel="stylesheet" href="stair-styles.css">
     <style>
-        /* Wizard step visibility controlled by active class only */
-        .wizard-step          { display: none; }
-        .wizard-step.active   { display: block; }
+        /* Wizard step visibility */
+        .wizard-step        { display: none; }
+        .wizard-step.active { display: block; }
 
         /* ============================================================
            Walk the Deck button
@@ -33,11 +33,11 @@
             transition: background 0.2s;
             white-space: nowrap;
         }
-        #walkBtn:hover  { background: #145c31; }
-        #walkBtn svg    { width: 16px; height: 16px; flex-shrink: 0; }
+        #walkBtn:hover { background: #145c31; }
+        #walkBtn svg   { width: 16px; height: 16px; flex-shrink: 0; }
 
         /* ============================================================
-           Walkthrough HUD overlay
+           Walkthrough HUD — desktop
         ============================================================ */
         #walkthroughHUD {
             position: fixed;
@@ -45,14 +45,13 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 9999;
-            /* pointer-events enabled so the slider is interactive */
-            pointer-events: auto;
+            pointer-events: none;
             transition: opacity 0.3s;
         }
-        #walkthroughHUD.wt-hud--hidden { opacity: 0; pointer-events: none; }
+        #walkthroughHUD.wt-hud--hidden { opacity: 0; }
 
         .wt-hud__inner {
-            background: rgba(0, 0, 0, 0.68);
+            background: rgba(0,0,0,0.68);
             backdrop-filter: blur(8px);
             border-radius: 20px;
             padding: 10px 22px 8px;
@@ -60,76 +59,15 @@
             flex-direction: column;
             align-items: center;
             gap: 6px;
-            min-width: 360px;
+            min-width: 340px;
+            pointer-events: none;
         }
+        /* Touch variant — buttons need pointer events */
+        .wt-hud__inner--touch { pointer-events: auto; }
 
-        /* Height row — person icon + label + slider + value */
-        .wt-hud__height-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-        }
-        .wt-hud__person-icon {
-            width: 18px;
-            height: 18px;
-            color: #a3e4b8;
-            flex-shrink: 0;
-        }
-        .wt-hud__height-label {
-            color: #a3e4b8;
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-        .wt-hud__slider {
-            flex: 1;
-            -webkit-appearance: none;
-            appearance: none;
-            height: 4px;
-            border-radius: 2px;
-            background: rgba(255,255,255,0.25);
-            outline: none;
-            cursor: pointer;
-        }
-        .wt-hud__slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #2ecc71;
-            cursor: pointer;
-            box-shadow: 0 0 4px rgba(46,204,113,0.6);
-            transition: transform 0.15s;
-        }
-        .wt-hud__slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
-        .wt-hud__slider::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #2ecc71;
-            cursor: pointer;
-            border: none;
-        }
-        .wt-hud__height-value {
-            color: #fff;
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            min-width: 36px;
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        /* Keys row */
         .wt-hud__keys-row {
             width: 100%;
             text-align: center;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 5px;
         }
         .wt-hud__keys {
             color: rgba(255,255,255,0.65);
@@ -137,6 +75,86 @@
             font-size: 12px;
             font-weight: 500;
             letter-spacing: 0.2px;
+        }
+        .wt-hud__crouch-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 5px;
+            width: 100%;
+        }
+        .wt-hud__crouch-label {
+            color: rgba(255,255,255,0.55);
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .wt-hud__crouch-label--active {
+            color: #2ecc71;
+            font-weight: 700;
+        }
+
+        /* Touch HUD buttons */
+        .wt-hud__crouch-btn,
+        .wt-hud__exit-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .wt-hud__crouch-btn {
+            background: rgba(46,204,113,0.25);
+            color: #2ecc71;
+            border: 1px solid rgba(46,204,113,0.5);
+        }
+        .wt-hud__exit-btn {
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+        }
+
+        /* ============================================================
+           Virtual joystick
+        ============================================================ */
+        #wtJoystick {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 35vw;     /* left 35% of screen is joystick zone */
+            height: 100%;
+            z-index: 9998;
+            pointer-events: none; /* touches handled on canvas directly */
+        }
+        #wtJsBase {
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            border: 2px solid rgba(255,255,255,0.22);
+            /* default resting position — overridden by JS on touch */
+            bottom: 40px;
+            left: 40px;
+            pointer-events: none;
+        }
+        #wtJsKnob {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(46,204,113,0.75);
+            box-shadow: 0 0 10px rgba(46,204,113,0.5);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: transform 0.05s linear;
         }
     </style>
 </head>
@@ -161,44 +179,21 @@
             <aside class="wizard-panel">
                 <!-- Progress Navigation -->
                 <nav class="progress-nav">
-                    <div class="progress-step active" data-step="1">
-                        <span class="progress-step__number">1</span>
-                        <span class="progress-step__label">Size</span>
-                    </div>
-                    <div class="progress-step" data-step="2">
-                        <span class="progress-step__number">2</span>
-                        <span class="progress-step__label">Structure</span>
-                    </div>
-                    <div class="progress-step" data-step="3">
-                        <span class="progress-step__number">3</span>
-                        <span class="progress-step__label">Pattern</span>
-                    </div>
-                    <div class="progress-step" data-step="4">
-                        <span class="progress-step__number">4</span>
-                        <span class="progress-step__label">Color</span>
-                    </div>
-                    <div class="progress-step" data-step="5">
-                        <span class="progress-step__number">5</span>
-                        <span class="progress-step__label">Options</span>
-                    </div>
-                    <div class="progress-step" data-step="6">
-                        <span class="progress-step__number">6</span>
-                        <span class="progress-step__label">Estimate</span>
-                    </div>
-                    <div class="progress-step" data-step="7">
-                        <span class="progress-step__number">7</span>
-                        <span class="progress-step__label">Review</span>
-                    </div>
+                    <div class="progress-step active" data-step="1"><span class="progress-step__number">1</span><span class="progress-step__label">Size</span></div>
+                    <div class="progress-step" data-step="2"><span class="progress-step__number">2</span><span class="progress-step__label">Structure</span></div>
+                    <div class="progress-step" data-step="3"><span class="progress-step__number">3</span><span class="progress-step__label">Pattern</span></div>
+                    <div class="progress-step" data-step="4"><span class="progress-step__number">4</span><span class="progress-step__label">Color</span></div>
+                    <div class="progress-step" data-step="5"><span class="progress-step__number">5</span><span class="progress-step__label">Options</span></div>
+                    <div class="progress-step" data-step="6"><span class="progress-step__number">6</span><span class="progress-step__label">Estimate</span></div>
+                    <div class="progress-step" data-step="7"><span class="progress-step__number">7</span><span class="progress-step__label">Review</span></div>
                 </nav>
 
-                <!-- Step Content -->
                 <div class="step-content">
 
-                    <!-- Step 1: Dimensions -->
+                    <!-- Step 1 -->
                     <section class="wizard-step active" data-step="1">
                         <h2 class="step__title">Deck Dimensions</h2>
                         <p class="step__desc">Enter the length and width of your deck in feet.</p>
-
                         <div class="form-group">
                             <label class="form-label">Length (feet)</label>
                             <div class="slider-input">
@@ -207,7 +202,6 @@
                                 <span class="unit">ft</span>
                             </div>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">Width (feet)</label>
                             <div class="slider-input">
@@ -216,7 +210,6 @@
                                 <span class="unit">ft</span>
                             </div>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">Deck Height (feet)</label>
                             <div class="slider-input">
@@ -226,7 +219,6 @@
                             </div>
                             <p class="form-hint">Height from ground to deck surface</p>
                         </div>
-
                         <div class="info-card">
                             <span class="info-card__icon">&#x1F4D0;</span>
                             <div class="info-card__content">
@@ -236,95 +228,47 @@
                         </div>
                     </section>
 
-                    <!-- Step 2: Structure -->
+                    <!-- Step 2 -->
                     <section class="wizard-step" data-step="2">
                         <h2 class="step__title">Structure Options</h2>
                         <p class="step__desc">Configure how your boards will be installed.</p>
-
                         <div class="form-group">
                             <label class="form-label">Board Direction</label>
                             <div class="radio-cards radio-cards--inline">
-                                <label class="radio-card radio-card--small selected">
-                                    <input type="radio" name="boardDirection" value="length" checked>
-                                    <span>Lengthwise</span>
-                                </label>
-                                <label class="radio-card radio-card--small">
-                                    <input type="radio" name="boardDirection" value="width">
-                                    <span>Widthwise</span>
-                                </label>
+                                <label class="radio-card radio-card--small selected"><input type="radio" name="boardDirection" value="length" checked><span>Lengthwise</span></label>
+                                <label class="radio-card radio-card--small"><input type="radio" name="boardDirection" value="width"><span>Widthwise</span></label>
                             </div>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">Joist Spacing</label>
                             <div class="radio-cards radio-cards--inline">
-                                <label class="radio-card radio-card--small selected">
-                                    <input type="radio" name="joistSpacing" value="16" checked>
-                                    <span>16" O.C.</span>
-                                </label>
-                                <label class="radio-card radio-card--small">
-                                    <input type="radio" name="joistSpacing" value="12">
-                                    <span>12" O.C.</span>
-                                </label>
+                                <label class="radio-card radio-card--small selected"><input type="radio" name="joistSpacing" value="16" checked><span>16" O.C.</span></label>
+                                <label class="radio-card radio-card--small"><input type="radio" name="joistSpacing" value="12"><span>12" O.C.</span></label>
                             </div>
                             <p class="form-hint">Standard is 16" on center. Use 12" for diagonal patterns or extra support.</p>
                         </div>
                     </section>
 
-                    <!-- Step 3: Pattern -->
+                    <!-- Step 3 -->
                     <section class="wizard-step" data-step="3">
                         <h2 class="step__title">Board Pattern</h2>
                         <p class="step__desc">Choose a pattern for your deck boards.</p>
-
                         <div class="form-group">
                             <div class="pattern-cards">
                                 <div class="pattern-card pattern-option selected" data-pattern="straight">
-                                    <div class="pattern-card__preview">
-                                        <svg viewBox="0 0 100 60">
-                                            <rect x="5" y="5" width="90" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="5" y="17" width="90" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="5" y="29" width="90" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="5" y="41" width="90" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="5" y="53" width="90" height="4" rx="1" fill="currentColor"></rect>
-                                        </svg>
-                                    </div>
-                                    <span class="pattern-card__title">Straight</span>
-                                    <span class="pattern-card__desc">Classic look</span>
+                                    <div class="pattern-card__preview"><svg viewBox="0 0 100 60"><rect x="5" y="5" width="90" height="8" rx="1" fill="currentColor"></rect><rect x="5" y="17" width="90" height="8" rx="1" fill="currentColor"></rect><rect x="5" y="29" width="90" height="8" rx="1" fill="currentColor"></rect><rect x="5" y="41" width="90" height="8" rx="1" fill="currentColor"></rect><rect x="5" y="53" width="90" height="4" rx="1" fill="currentColor"></rect></svg></div>
+                                    <span class="pattern-card__title">Straight</span><span class="pattern-card__desc">Classic look</span>
                                 </div>
-
                                 <div class="pattern-card pattern-option" data-pattern="breaker">
-                                    <div class="pattern-card__preview">
-                                        <svg viewBox="0 0 100 60">
-                                            <rect x="5" y="5" width="40" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="55" y="5" width="40" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="5" y="17" width="40" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="55" y="17" width="40" height="8" rx="1" fill="currentColor"></rect>
-                                            <rect x="47" y="5" width="6" height="44" rx="1" fill="currentColor" opacity="0.6"></rect>
-                                        </svg>
-                                    </div>
-                                    <span class="pattern-card__title">Breaker</span>
-                                    <span class="pattern-card__desc">With center board</span>
+                                    <div class="pattern-card__preview"><svg viewBox="0 0 100 60"><rect x="5" y="5" width="40" height="8" rx="1" fill="currentColor"></rect><rect x="55" y="5" width="40" height="8" rx="1" fill="currentColor"></rect><rect x="5" y="17" width="40" height="8" rx="1" fill="currentColor"></rect><rect x="55" y="17" width="40" height="8" rx="1" fill="currentColor"></rect><rect x="47" y="5" width="6" height="44" rx="1" fill="currentColor" opacity="0.6"></rect></svg></div>
+                                    <span class="pattern-card__title">Breaker</span><span class="pattern-card__desc">With center board</span>
                                 </div>
-
                                 <div class="pattern-card pattern-option" data-pattern="picture-frame">
-                                    <div class="pattern-card__preview">
-                                        <svg viewBox="0 0 100 60">
-                                            <rect x="5" y="5" width="90" height="6" rx="1" fill="currentColor" opacity="0.6"></rect>
-                                            <rect x="5" y="49" width="90" height="6" rx="1" fill="currentColor" opacity="0.6"></rect>
-                                            <rect x="5" y="11" width="6" height="38" rx="1" fill="currentColor" opacity="0.6"></rect>
-                                            <rect x="89" y="11" width="6" height="38" rx="1" fill="currentColor" opacity="0.6"></rect>
-                                            <rect x="14" y="14" width="72" height="5" rx="1" fill="currentColor"></rect>
-                                            <rect x="14" y="22" width="72" height="5" rx="1" fill="currentColor"></rect>
-                                            <rect x="14" y="30" width="72" height="5" rx="1" fill="currentColor"></rect>
-                                            <rect x="14" y="38" width="72" height="5" rx="1" fill="currentColor"></rect>
-                                        </svg>
-                                    </div>
-                                    <span class="pattern-card__title">Picture Frame</span>
-                                    <span class="pattern-card__desc">Border accent</span>
+                                    <div class="pattern-card__preview"><svg viewBox="0 0 100 60"><rect x="5" y="5" width="90" height="6" rx="1" fill="currentColor" opacity="0.6"></rect><rect x="5" y="49" width="90" height="6" rx="1" fill="currentColor" opacity="0.6"></rect><rect x="5" y="11" width="6" height="38" rx="1" fill="currentColor" opacity="0.6"></rect><rect x="89" y="11" width="6" height="38" rx="1" fill="currentColor" opacity="0.6"></rect><rect x="14" y="14" width="72" height="5" rx="1" fill="currentColor"></rect><rect x="14" y="22" width="72" height="5" rx="1" fill="currentColor"></rect><rect x="14" y="30" width="72" height="5" rx="1" fill="currentColor"></rect><rect x="14" y="38" width="72" height="5" rx="1" fill="currentColor"></rect></svg></div>
+                                    <span class="pattern-card__title">Picture Frame</span><span class="pattern-card__desc">Border accent</span>
                                 </div>
                             </div>
                         </div>
-
                         <div class="form-group hidden" id="borderWidthSection">
                             <label class="form-label">Border Width (boards)</label>
                             <div class="slider-input">
@@ -332,25 +276,17 @@
                                 <input type="number" id="borderWidthInput" class="number-input" min="1" max="3" value="1">
                             </div>
                         </div>
-
                         <div class="form-group hidden" id="breakerColorSection">
-                            <div class="checkbox-toggle">
-                                <input type="checkbox" id="breakerSameColor" checked>
-                                <label for="breakerSameColor">Use same color for breaker board</label>
-                            </div>
+                            <div class="checkbox-toggle"><input type="checkbox" id="breakerSameColor" checked><label for="breakerSameColor">Use same color for breaker board</label></div>
                             <div class="color-swatches" id="breakerColorSwatches" style="margin-top:8px"></div>
                         </div>
-
                         <div class="form-group hidden" id="borderColorSection">
-                            <div class="checkbox-toggle">
-                                <input type="checkbox" id="borderSameColor" checked>
-                                <label for="borderSameColor">Use same color for border</label>
-                            </div>
+                            <div class="checkbox-toggle"><input type="checkbox" id="borderSameColor" checked><label for="borderSameColor">Use same color for border</label></div>
                             <div class="color-swatches" id="borderColorSwatches" style="margin-top:8px"></div>
                         </div>
                     </section>
 
-                    <!-- Step 4: Color -->
+                    <!-- Step 4 -->
                     <section class="wizard-step" data-step="4">
                         <h2 class="step__title">Select Color</h2>
                         <p class="step__desc">Choose from our premium TrueGrain colors.</p>
@@ -360,34 +296,22 @@
                         </div>
                     </section>
 
-                    <!-- Step 5: Options -->
+                    <!-- Step 5 -->
                     <section class="wizard-step" data-step="5">
                         <h2 class="step__title">Additional Options</h2>
                         <p class="step__desc">Customize your deck with additional features.</p>
-
                         <div class="form-group">
-                            <div class="checkbox-toggle">
-                                <input type="checkbox" id="showRailings">
-                                <label for="showRailings">Add railings to visualization</label>
-                            </div>
+                            <div class="checkbox-toggle"><input type="checkbox" id="showRailings"><label for="showRailings">Add railings to visualization</label></div>
                             <p class="form-hint">Railings are for visualization only and not included in the estimate.</p>
                         </div>
-
                         <div class="form-group">
-                            <div class="checkbox-toggle">
-                                <input type="checkbox" id="stairsEnabled">
-                                <label for="stairsEnabled">Add stairs to deck</label>
-                            </div>
+                            <div class="checkbox-toggle"><input type="checkbox" id="stairsEnabled"><label for="stairsEnabled">Add stairs to deck</label></div>
                             <p class="form-hint">Requires deck height of at least 1 ft.</p>
                         </div>
-
                         <div class="stair-panel hidden" id="stairEdgeSection">
                             <div class="stair-list" id="stairList">
-                                <div class="stair-list-empty">
-                                    <p>No stairs added yet. Click an edge button below to add stairs.</p>
-                                </div>
+                                <div class="stair-list-empty"><p>No stairs added yet. Click an edge button below to add stairs.</p></div>
                             </div>
-
                             <div class="stair-add-controls">
                                 <span class="stair-add-label">Add stairs to:</span>
                                 <div class="stair-edge-buttons">
@@ -397,10 +321,8 @@
                                     <button type="button" class="stair-edge-btn" data-edge="right">Right</button>
                                 </div>
                             </div>
-
                             <div class="stair-editor hidden" id="stairEditor">
                                 <h4 class="stair-editor-title">Edit Stair: <span id="stairEditorEdge"></span></h4>
-
                                 <div class="form-group">
                                     <label class="form-label">Stair Width (feet)</label>
                                     <div class="slider-input">
@@ -410,54 +332,32 @@
                                     </div>
                                     <p class="form-hint">Minimum 36" for code compliance.</p>
                                 </div>
-
                                 <div class="form-group">
                                     <label class="form-label">Boards Per Tread</label>
                                     <div class="radio-cards radio-cards--inline">
-                                        <label class="radio-card radio-card--small">
-                                            <input type="radio" name="boardsPerTread" value="1"><span>1</span>
-                                        </label>
-                                        <label class="radio-card radio-card--small selected">
-                                            <input type="radio" name="boardsPerTread" value="2" checked><span>2</span>
-                                        </label>
-                                        <label class="radio-card radio-card--small">
-                                            <input type="radio" name="boardsPerTread" value="3"><span>3</span>
-                                        </label>
+                                        <label class="radio-card radio-card--small"><input type="radio" name="boardsPerTread" value="1"><span>1</span></label>
+                                        <label class="radio-card radio-card--small selected"><input type="radio" name="boardsPerTread" value="2" checked><span>2</span></label>
+                                        <label class="radio-card radio-card--small"><input type="radio" name="boardsPerTread" value="3"><span>3</span></label>
                                     </div>
                                 </div>
-
                                 <div class="stair-info-card" id="treadDepthCard">
-                                    <div class="stair-info-row">
-                                        <span class="stair-info-label">Tread Depth:</span>
-                                        <span class="stair-info-value" id="treadDepthDisplay">11"</span>
-                                    </div>
+                                    <div class="stair-info-row"><span class="stair-info-label">Tread Depth:</span><span class="stair-info-value" id="treadDepthDisplay">11"</span></div>
                                 </div>
-
                                 <div class="form-group">
                                     <label class="form-label">Stair Shape</label>
                                     <div class="radio-cards radio-cards--inline">
-                                        <label class="radio-card radio-card--small selected">
-                                            <input type="radio" name="stairShape" value="straight" checked><span>Straight</span>
-                                        </label>
-                                        <label class="radio-card radio-card--small">
-                                            <input type="radio" name="stairShape" value="l-shape"><span>L-Shape</span>
-                                        </label>
+                                        <label class="radio-card radio-card--small selected"><input type="radio" name="stairShape" value="straight" checked><span>Straight</span></label>
+                                        <label class="radio-card radio-card--small"><input type="radio" name="stairShape" value="l-shape"><span>L-Shape</span></label>
                                     </div>
                                 </div>
-
                                 <div class="l-shape-options hidden" id="lShapeOptions">
                                     <div class="form-group">
                                         <label class="form-label">Turn Direction</label>
                                         <div class="radio-cards radio-cards--inline">
-                                            <label class="radio-card radio-card--small">
-                                                <input type="radio" name="stairTurnDirection" value="left"><span>Turn Left</span>
-                                            </label>
-                                            <label class="radio-card radio-card--small selected">
-                                                <input type="radio" name="stairTurnDirection" value="right" checked><span>Turn Right</span>
-                                            </label>
+                                            <label class="radio-card radio-card--small"><input type="radio" name="stairTurnDirection" value="left"><span>Turn Left</span></label>
+                                            <label class="radio-card radio-card--small selected"><input type="radio" name="stairTurnDirection" value="right" checked><span>Turn Right</span></label>
                                         </div>
                                     </div>
-
                                     <div class="form-group">
                                         <label class="form-label">Landing Depth (feet)</label>
                                         <div class="slider-input">
@@ -467,7 +367,6 @@
                                         </div>
                                         <p class="form-hint">Minimum 3 ft per IRC R311.7.6.</p>
                                     </div>
-
                                     <div class="form-group">
                                         <label class="form-label">Landing Position</label>
                                         <div class="slider-input">
@@ -477,7 +376,6 @@
                                         </div>
                                         <p class="form-hint">50% = landing halfway up.</p>
                                     </div>
-
                                     <div class="stair-info-card" id="lShapeInfoCard">
                                         <div class="stair-info-header">L-Shape Dimensions</div>
                                         <div class="stair-info-row"><span class="stair-info-label">Lower Run Steps:</span><span class="stair-info-value" id="lShapeLowerSteps">2</span></div>
@@ -487,31 +385,24 @@
                                         <div class="stair-info-row"><span class="stair-info-label">Upper Run:</span><span class="stair-info-value" id="lShapeUpperRun">1.75 ft</span></div>
                                     </div>
                                 </div>
-
                                 <div class="form-group">
-                                    <div class="checkbox-toggle">
-                                        <input type="checkbox" id="stairHandrails" checked>
-                                        <label for="stairHandrails">Include handrails on stairs</label>
-                                    </div>
+                                    <div class="checkbox-toggle"><input type="checkbox" id="stairHandrails" checked><label for="stairHandrails">Include handrails on stairs</label></div>
                                 </div>
-
                                 <div class="stair-info-card" id="stairInfoCard">
                                     <div class="stair-info-header">Calculated Dimensions</div>
                                     <div class="stair-info-row"><span class="stair-info-label">Number of Steps:</span><span class="stair-info-value" id="stairStepCount">4</span></div>
                                     <div class="stair-info-row"><span class="stair-info-label">Total Run:</span><span class="stair-info-value" id="stairTotalRun">3.5 ft</span></div>
                                     <div class="stair-info-row"><span class="stair-info-label">Rise per Step:</span><span class="stair-info-value" id="stairRisePerStep">7.5"</span></div>
                                 </div>
-
                                 <button type="button" class="btn btn--danger btn--small" id="deleteStairBtn" style="width:100%;margin-top:12px">Remove This Stair</button>
                             </div>
                         </div>
                     </section>
 
-                    <!-- Step 6: Estimate -->
+                    <!-- Step 6 -->
                     <section class="wizard-step" data-step="6">
                         <h2 class="step__title">Material Estimate</h2>
                         <p class="step__desc">Review your estimated materials and costs.</p>
-
                         <div class="form-group">
                             <label class="form-label">Waste Factor</label>
                             <div class="slider-input">
@@ -521,7 +412,6 @@
                             </div>
                             <p class="form-hint">Industry standard is 10%.</p>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">Price Per Linear Foot</label>
                             <div class="slider-input">
@@ -530,30 +420,23 @@
                                 <span class="unit">$/LF</span>
                             </div>
                         </div>
-
                         <div class="form-group">
-                            <div class="checkbox-toggle">
-                                <input type="checkbox" id="includeLaborEstimate">
-                                <label for="includeLaborEstimate">Include labor estimate</label>
-                            </div>
+                            <div class="checkbox-toggle"><input type="checkbox" id="includeLaborEstimate"><label for="includeLaborEstimate">Include labor estimate</label></div>
                         </div>
-
                         <div class="optimization-card">
                             <div class="optimization-card__header">Board Length Optimization</div>
                             <div class="optimization-card__content" id="optimizationContent">
                                 <p style="color:var(--color-text-muted);font-size:var(--font-size-sm)">Calculating...</p>
                             </div>
                         </div>
-
                         <div id="boardBreakdownContent"></div>
                         <div class="estimate-summary" id="estimateSummary"></div>
                     </section>
 
-                    <!-- Step 7: Review -->
+                    <!-- Step 7 -->
                     <section class="wizard-step" data-step="7">
                         <h2 class="step__title">Review &amp; Export</h2>
                         <p class="step__desc">Review your design and download your estimate.</p>
-
                         <div class="review-summary" id="reviewSummary">
                             <div class="review-row"><span class="review-label">Size</span><span id="reviewDeckSize"></span></div>
                             <div class="review-row"><span class="review-label">Area</span><span id="reviewDeckArea"></span></div>
@@ -564,42 +447,23 @@
                             <div class="review-row"><span class="review-label">Lineal Feet</span><span id="reviewBoardLF"></span></div>
                             <div class="review-row review-row--total"><span class="review-label">Est. Total</span><span id="reviewTotalCost"></span></div>
                         </div>
-
                         <div class="contact-form">
                             <h3>Get a Quote</h3>
-                            <div class="form-group">
-                                <label class="form-label">Name</label>
-                                <input type="text" id="contactName" class="text-input" placeholder="Your name">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Email</label>
-                                <input type="email" id="contactEmail" class="text-input" placeholder="you@email.com">
-                            </div>
+                            <div class="form-group"><label class="form-label">Name</label><input type="text" id="contactName" class="text-input" placeholder="Your name"></div>
+                            <div class="form-group"><label class="form-label">Email</label><input type="email" id="contactEmail" class="text-input" placeholder="you@email.com"></div>
                             <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Phone</label>
-                                    <input type="tel" id="contactPhone" class="text-input" placeholder="555-123-4567">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">ZIP Code</label>
-                                    <input type="text" id="contactZip" class="text-input" placeholder="12345">
-                                </div>
+                                <div class="form-group"><label class="form-label">Phone</label><input type="tel" id="contactPhone" class="text-input" placeholder="555-123-4567"></div>
+                                <div class="form-group"><label class="form-label">ZIP Code</label><input type="text" id="contactZip" class="text-input" placeholder="12345"></div>
                             </div>
                         </div>
-
                         <div class="export-actions">
-                            <button class="btn btn--success btn--large" id="submitQuoteBtn">
-                                Submit to Sales Team
-                            </button>
-                            <button class="btn btn--secondary btn--large" data-action="generate-pdf">
-                                Download PDF
-                            </button>
+                            <button class="btn btn--success btn--large" id="submitQuoteBtn">Submit to Sales Team</button>
+                            <button class="btn btn--secondary btn--large" data-action="generate-pdf">Download PDF</button>
                         </div>
                     </section>
 
                 </div>
 
-                <!-- Wizard Navigation -->
                 <div class="wizard-nav">
                     <button class="btn btn--secondary" id="prevBtn" data-prev-step disabled>Back</button>
                     <button class="btn btn--primary"   id="nextBtn" data-next-step>Next</button>
@@ -611,7 +475,6 @@
                 <div class="view-controls">
                     <button class="view-btn selected" id="view3D" data-view="3d">3D View</button>
                     <button class="view-btn" id="viewTop" data-view="top">Top Down</button>
-                    <!-- Walk the Deck button — always visible alongside view controls -->
                     <button id="walkBtn" title="Enter first-person walkthrough mode">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="5" r="2"></circle>
@@ -622,40 +485,20 @@
                         Walk the Deck
                     </button>
                 </div>
-
                 <div class="scene-container" id="sceneContainer">
                     <canvas id="deckCanvas"></canvas>
-                    <div class="scene-loading" id="sceneLoading">
-                        <div class="spinner"></div>
-                        <span>Loading visualization...</span>
-                    </div>
-                    <div class="building-spinner hidden" id="buildingSpinner">
-                        <div class="spinner"></div>
-                        <p>Updating design...</p>
-                    </div>
+                    <div class="scene-loading" id="sceneLoading"><div class="spinner"></div><span>Loading visualization...</span></div>
+                    <div class="building-spinner hidden" id="buildingSpinner"><div class="spinner"></div><p>Updating design...</p></div>
                 </div>
-
                 <div class="scene-controls">
                     <button class="scene-control-btn" id="zoomIn" aria-label="Zoom In">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            <line x1="11" y1="8" x2="11" y2="14"></line>
-                            <line x1="8" y1="11" x2="14" y2="11"></line>
-                        </svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
                     </button>
                     <button class="scene-control-btn" id="zoomOut" aria-label="Zoom Out">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            <line x1="8" y1="11" x2="14" y2="11"></line>
-                        </svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
                     </button>
                     <button class="scene-control-btn" id="resetViewBtn" aria-label="Reset View">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                            <path d="M3 3v5h5"></path>
-                        </svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
                     </button>
                 </div>
             </section>
@@ -677,8 +520,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-    <!-- TrueGrain Deck Builder 2.0 — Modular Entry Point -->
     <script type="module" src="src/main.js"></script>
 </body>
 </html>
