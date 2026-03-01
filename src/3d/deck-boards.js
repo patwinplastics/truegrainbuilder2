@@ -46,48 +46,70 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 // ============================================================
 // Build a mitered board mesh from 4 absolute XZ corner points.
 //
-// pts: [[x0,z0],[x1,z1],[x2,z2],[x3,z3]] CCW order (top-down)
-// Calls toNonIndexed() so each triangle gets its own verts and
-// computeVertexNormals() produces flat per-face normals.
+// pts:    [[x0,z0],...[x3,z3]]  CCW order top-down
+//         [outer-left, outer-right, inner-right, inner-left]
+// uvOrigin: [ox, oz]  world XZ origin of UV space
+// uAxis:  [dx, dz]  direction of U (along board length)
+// vAxis:  [dx, dz]  direction of V (across board width)
+// uScale: length of board for U normalisation
+// vScale: board width for V normalisation (= bw)
 // ============================================================
-function buildMiteredMesh(pts, yBot, yTop, material) {
-    const p = new Float32Array([
-        pts[0][0], yBot, pts[0][1],  // 0 bottom outer-left
-        pts[1][0], yBot, pts[1][1],  // 1 bottom outer-right
-        pts[2][0], yBot, pts[2][1],  // 2 bottom inner-right
-        pts[3][0], yBot, pts[3][1],  // 3 bottom inner-left
-        pts[0][0], yTop, pts[0][1],  // 4 top outer-left
-        pts[1][0], yTop, pts[1][1],  // 5 top outer-right
-        pts[2][0], yTop, pts[2][1],  // 6 top inner-right
-        pts[3][0], yTop, pts[3][1],  // 7 top inner-left
+function buildMiteredMesh(pts, yBot, yTop, uvOrigin, uAxis, vAxis, uScale, vScale, material) {
+    function uv(x, z) {
+        const dx = x - uvOrigin[0];
+        const dz = z - uvOrigin[1];
+        const u  = (dx * uAxis[0] + dz * uAxis[1]) / uScale;
+        const v  = (dx * vAxis[0] + dz * vAxis[1]) / vScale;
+        return [u, v];
+    }
+
+    // 8 positions: 0-3 bottom, 4-7 top (same XZ, different Y)
+    const positions = new Float32Array([
+        pts[0][0], yBot, pts[0][1],
+        pts[1][0], yBot, pts[1][1],
+        pts[2][0], yBot, pts[2][1],
+        pts[3][0], yBot, pts[3][1],
+        pts[0][0], yTop, pts[0][1],
+        pts[1][0], yTop, pts[1][1],
+        pts[2][0], yTop, pts[2][1],
+        pts[3][0], yTop, pts[3][1],
     ]);
 
-    const idx = [
-        // Top face
-        4, 6, 5,  4, 7, 6,
-        // Bottom face
-        0, 1, 2,  0, 2, 3,
-        // Outer edge
-        0, 5, 1,  0, 4, 5,
-        // Right miter edge
-        1, 6, 2,  1, 5, 6,
-        // Inner edge
-        2, 7, 3,  2, 6, 7,
-        // Left miter edge
-        3, 4, 0,  3, 7, 4,
+    // Precompute UVs per vertex index
+    const uvMap = [
+        uv(pts[0][0], pts[0][1]),  // 0 bottom outer-left
+        uv(pts[1][0], pts[1][1]),  // 1 bottom outer-right
+        uv(pts[2][0], pts[2][1]),  // 2 bottom inner-right
+        uv(pts[3][0], pts[3][1]),  // 3 bottom inner-left
+        uv(pts[0][0], pts[0][1]),  // 4 top outer-left
+        uv(pts[1][0], pts[1][1]),  // 5 top outer-right
+        uv(pts[2][0], pts[2][1]),  // 6 top inner-right
+        uv(pts[3][0], pts[3][1]),  // 7 top inner-left
     ];
 
-    const indexedGeom = new THREE.BufferGeometry();
-    indexedGeom.setAttribute('position', new THREE.BufferAttribute(p, 3));
-    indexedGeom.setIndex(idx);
+    // Triangles: [v0, v1, v2] CCW from outside
+    const triangles = [
+        [4, 6, 5], [4, 7, 6],   // top
+        [0, 1, 2], [0, 2, 3],   // bottom
+        [0, 5, 1], [0, 4, 5],   // outer edge
+        [1, 6, 2], [1, 5, 6],   // right miter
+        [2, 7, 3], [2, 6, 7],   // inner edge
+        [3, 4, 0], [3, 7, 4],   // left miter
+    ];
 
-    // toNonIndexed() splits shared verts so each face gets its own
-    // vertices — computeVertexNormals() then produces true flat normals
-    // with no cross-face averaging that causes dark/discolored sides.
-    const geom = indexedGeom.toNonIndexed();
+    const posArr = [];
+    const uvArr  = [];
+    for (const [a, b, c] of triangles) {
+        for (const vi of [a, b, c]) {
+            posArr.push(positions[vi*3], positions[vi*3+1], positions[vi*3+2]);
+            uvArr.push(uvMap[vi][0], uvMap[vi][1]);
+        }
+    }
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArr), 3));
+    geom.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(uvArr),  2));
     geom.computeVertexNormals();
-    indexedGeom.dispose();
-
     return new THREE.Mesh(geom, material);
 }
 
@@ -96,8 +118,8 @@ function buildMiteredMesh(pts, yBot, yTop, material) {
 // ============================================================
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
-    const bc    = state.borderWidth;
-    const bwFt  = bc * ew;
+    const bc     = state.borderWidth;
+    const bwFt   = bc * ew;
     const bColor = state.borderSameColor ? colorConfig
         : (CONFIG.colors.find(c => c.id === state.borderColor) || colorConfig);
     const isLen = state.boardDirection === 'length';
@@ -112,33 +134,49 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         const yBot = state.deckHeight;
         const yTop = state.deckHeight + bt;
 
-        // FRONT board: outer edge at z = -W0
-        const frontMesh = buildMiteredMesh(
-            [[-L0, -W0], [L0, -W0], [L1, -W1], [-L1, -W1]],
-            yBot, yTop, createBoardMaterial(bColor, dL, false, `bf${i}`));
-        frontMesh.castShadow = frontMesh.receiveShadow = true;
-        deckGroup.add(frontMesh);
+        // FRONT: runs along X, outer edge at z = -W0
+        // U = X direction (0..1 over 2*L0), V = Z inward (0..1 over bw)
+        deckGroup.add(Object.assign(
+            buildMiteredMesh(
+                [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
+                yBot, yTop,
+                [-L0, -W0], [1,0], [0,1], 2*L0, bw,
+                createBoardMaterial(bColor, dL, false, `bf${i}`)
+            ), { castShadow: true, receiveShadow: true }
+        ));
 
-        // BACK board: outer edge at z = +W0
-        const backMesh = buildMiteredMesh(
-            [[L0, W0], [-L0, W0], [-L1, W1], [L1, W1]],
-            yBot, yTop, createBoardMaterial(bColor, dL, false, `bb${i}`));
-        backMesh.castShadow = backMesh.receiveShadow = true;
-        deckGroup.add(backMesh);
+        // BACK: runs along X, outer edge at z = +W0
+        // U = X direction, V = -Z inward (0..1 over bw)
+        deckGroup.add(Object.assign(
+            buildMiteredMesh(
+                [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
+                yBot, yTop,
+                [-L0, W0], [1,0], [0,-1], 2*L0, bw,
+                createBoardMaterial(bColor, dL, false, `bb${i}`)
+            ), { castShadow: true, receiveShadow: true }
+        ));
 
-        // LEFT board: outer edge at x = -L0
-        const leftMesh = buildMiteredMesh(
-            [[-L0, W0], [-L0, -W0], [-L1, -W1], [-L1, W1]],
-            yBot, yTop, createBoardMaterial(bColor, dW, true, `bl${i}`));
-        leftMesh.castShadow = leftMesh.receiveShadow = true;
-        deckGroup.add(leftMesh);
+        // LEFT: runs along Z, outer edge at x = -L0
+        // U = Z direction (0..1 over 2*W0), V = X inward (0..1 over bw)
+        deckGroup.add(Object.assign(
+            buildMiteredMesh(
+                [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
+                yBot, yTop,
+                [-L0, -W0], [0,1], [1,0], 2*W0, bw,
+                createBoardMaterial(bColor, dW, true, `bl${i}`)
+            ), { castShadow: true, receiveShadow: true }
+        ));
 
-        // RIGHT board: outer edge at x = +L0
-        const rightMesh = buildMiteredMesh(
-            [[L0, -W0], [L0, W0], [L1, W1], [L1, -W1]],
-            yBot, yTop, createBoardMaterial(bColor, dW, true, `br${i}`));
-        rightMesh.castShadow = rightMesh.receiveShadow = true;
-        deckGroup.add(rightMesh);
+        // RIGHT: runs along Z, outer edge at x = +L0
+        // U = Z direction, V = -X inward (0..1 over bw)
+        deckGroup.add(Object.assign(
+            buildMiteredMesh(
+                [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
+                yBot, yTop,
+                [L0, -W0], [0,1], [-1,0], 2*W0, bw,
+                createBoardMaterial(bColor, dW, true, `br${i}`)
+            ), { castShadow: true, receiveShadow: true }
+        ));
     }
 
     // Fill boards
