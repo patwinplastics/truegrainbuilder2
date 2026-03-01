@@ -7,7 +7,39 @@ export const textureCache  = {};
 export const materialCache = {};
 export const geometryCache = {};
 
+const MAX_TEXTURE_SIZE = 1024;
 let maxAniso = 1;
+
+/**
+ * Downsample a texture's image to MAX_TEXTURE_SIZE if either dimension
+ * exceeds it.  Uses an offscreen canvas to resize the image BEFORE
+ * Three.js uploads it to the GPU, keeping VRAM usage predictable.
+ *
+ * 1024x1024 RGBA = ~4 MB per texture on the GPU.
+ * Raw photos (4000x4000) would be ~64-85 MB each.
+ */
+function downsampleTexture(texture, maxSize) {
+    if (!maxSize) maxSize = MAX_TEXTURE_SIZE;
+    const image = texture.image;
+    if (!image || (image.width <= maxSize && image.height <= maxSize)) return texture;
+
+    const scale = maxSize / Math.max(image.width, image.height);
+    const w = Math.round(image.width * scale);
+    const h = Math.round(image.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled  = true;
+    ctx.imageSmoothingQuality  = 'high';
+    ctx.drawImage(image, 0, 0, w, h);
+
+    texture.image = canvas;
+    texture.needsUpdate = true;
+    console.info(`Downsampled texture from ${image.width}x${image.height} to ${w}x${h}`);
+    return texture;
+}
 
 export function preloadTextures() {
     const loader = new THREE.TextureLoader();
@@ -16,6 +48,7 @@ export function preloadTextures() {
         loader.load(
             CONFIG.texturePath + color.file,
             tex => {
+                downsampleTexture(tex, MAX_TEXTURE_SIZE);
                 tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
                 tex.anisotropy = maxAniso;
                 textureCache[color.id] = tex;
@@ -82,6 +115,7 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
         applyTex(textureCache[colorConfig.id]);
     } else {
         new THREE.TextureLoader().load(CONFIG.texturePath + colorConfig.file, src => {
+            downsampleTexture(src, MAX_TEXTURE_SIZE);
             src.wrapS = src.wrapT = THREE.ClampToEdgeWrapping;
             src.anisotropy = maxAniso;
             textureCache[colorConfig.id] = src;
