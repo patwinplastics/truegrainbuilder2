@@ -81,7 +81,9 @@ export function initScene() {
     const sun = new THREE.DirectionalLight(0xffffff, 0.8);
     sun.position.set(20, 30, 20);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = sun.shadow.mapSize.height = 1024;
+    sun.shadow.mapSize.width = sun.shadow.mapSize.height = 2048;
+    sun.shadow.bias       = -0.001;
+    sun.shadow.normalBias =  0.02;
     Object.assign(sun.shadow.camera, { near: 0.5, far: 100, left: -40, right: 40, top: 40, bottom: -40 });
     scene.add(sun);
 
