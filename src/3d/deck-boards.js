@@ -13,8 +13,6 @@ function dims() {
 }
 
 // Compute length segments so each sub-quad is roughly square.
-// This eliminates the diagonal texture interpolation seam that
-// appears when a long rectangle is split into only 2 triangles.
 function boardSegs(lengthFt, widthFt) {
     return Math.max(1, Math.ceil(lengthFt / widthFt));
 }
@@ -47,7 +45,8 @@ function createStraightBoards(deckGroup, state, colorConfig) {
                     isLen ? segs : 1, 1, isLen ? 1 : segs
                 ), mat);
             m.position.set(isLen ? ro + sl / 2 : co, boardY, isLen ? co : ro + sl / 2);
-            m.castShadow = m.receiveShadow = true;
+            m.castShadow = true;
+            m.receiveShadow = false;
             deckGroup.add(m);
             ro += sl + g;
         });
@@ -56,18 +55,6 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 
 // ============================================================
 // Build a mitered board mesh.
-//
-// pts: [[x0,z0],[x1,z1],[x2,z2],[x3,z3]]
-//      [outer-A, outer-B, inner-B, inner-A]
-//
-// xMin/xMax/zMin/zMax: bounding box of THIS board's vertices.
-//   Each board gets its own bounds so the texture UV spans 0..1
-//   across the board's actual footprint (not the full deck).
-//
-// swapUV: controls grain direction by swapping U and V.
-//   Texture grain runs along the V axis (image vertical).
-//   true  -> V maps to normalized X -> grain along X (FRONT/BACK)
-//   false -> V maps to normalized Z -> grain along Z (LEFT/RIGHT)
 // ============================================================
 function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, material) {
     function uv(x, z) {
@@ -112,17 +99,13 @@ function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, mater
     geom.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(uvArr),  2));
     geom.computeVertexNormals();
     const mesh = new THREE.Mesh(geom, material);
-    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    mesh.receiveShadow = false;
     return mesh;
 }
 
 // ============================================================
 // Picture frame — precise 45-degree mitered corners
-//
-// Each border board gets UV bounds tight to its own footprint.
-// Grain direction is controlled by swapUV:
-//   FRONT/BACK run along X -> swapUV=true  -> grain along X
-//   LEFT/RIGHT run along Z -> swapUV=false -> grain along Z
 // ============================================================
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
@@ -163,7 +146,7 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         ));
     }
 
-    // Fill boards (subdivided along length)
+    // Fill boards
     const isLen  = state.boardDirection === 'length';
     const bwFt   = bc * ew;
     const iLen   = dL - 2 * bwFt;
@@ -181,7 +164,8 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
                 isLen ? fillSegs : 1, 1, isLen ? 1 : fillSegs
             ), mat);
         m.position.set(isLen ? 0 : co, state.deckHeight + bt / 2, isLen ? co : 0);
-        m.castShadow = m.receiveShadow = true;
+        m.castShadow = true;
+        m.receiveShadow = false;
         deckGroup.add(m);
     }
 }
@@ -206,7 +190,9 @@ function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
         createBoardMaterial(bColor, cov, isLen, 'breaker')
     );
     br.position.set(isLen ? bp - run / 2 : 0, boardY, isLen ? 0 : bp - run / 2);
-    br.castShadow = true; deckGroup.add(br);
+    br.castShadow = true;
+    br.receiveShadow = false;
+    deckGroup.add(br);
     const s1 = bp - bw / 2 - g, s2 = run - bp - bw / 2 - g;
     for (let row = 0; row < numRows; row++) {
         const co = (row * ew) - cov / 2 + bw / 2;
@@ -221,7 +207,9 @@ function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
                 createBoardMaterial(colorConfig, sl, !isLen, `bk${si}_${row}`)
             );
             m.position.set(isLen ? ctr : co, boardY, isLen ? co : ctr);
-            m.castShadow = true; deckGroup.add(m);
+            m.castShadow = true;
+            m.receiveShadow = false;
+            deckGroup.add(m);
         });
     }
 }
