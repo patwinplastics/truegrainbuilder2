@@ -126,14 +126,12 @@ function computeFillSegments(run, gap, layoutSegments) {
             segs.push(sl);
             remaining -= sl + gap;
         }
-        // If layout segments didn't cover the full fill run, pad with equal pieces
         if (remaining > 0) {
-            const n = Math.ceil(remaining / maxSegFt);
+            const n = Math.max(1, Math.ceil(remaining / maxSegFt));
             const piece = (remaining - Math.max(0, n - 1) * gap) / n;
             for (let j = 0; j < n; j++) segs.push(piece);
         }
     } else {
-        // No segments available: equal subdivision
         const n = Math.max(1, Math.ceil(run / maxSegFt));
         const piece = (run - Math.max(0, n - 1) * gap) / n;
         for (let j = 0; j < n; j++) segs.push(piece);
@@ -189,7 +187,9 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         ));
     }
 
-    // Fill boards — subdivided into segments for proper texture mapping
+    // Fill boards — identical pattern to createStraightBoards:
+    // one createBoardMaterial call per segment with uniqueId `pf${r}_${si}`
+    // so rotation is always correctly keyed to the current isLen value.
     const isLen  = state.boardDirection === 'length';
     const bwFt   = bc * ew;
     const iLen   = dL - 2 * bwFt;
@@ -197,10 +197,7 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const run    = isLen ? iLen : iWid;
     const cov    = isLen ? iWid : iLen;
     const nRows  = Math.ceil(cov / ew);
-
     const fillSegs = computeFillSegments(run, g, state.boardLayout?.segments);
-    // All fill segments share one material (same color + rotation)
-    const fillMat = createBoardMaterial(colorConfig, run, !isLen, 'pf_fill');
 
     for (let r = 0; r < nRows; r++) {
         const co = (r * ew) - cov / 2 + bw / 2;
@@ -208,8 +205,10 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         for (let si = 0; si < fillSegs.length; si++) {
             const sl = fillSegs[si];
             if (sl <= 0) continue;
+            // Mirror straight board: unique key per segment encodes isLen via rotation
+            const mat = createBoardMaterial(colorConfig, sl, !isLen, `pf${r}_${si}`);
             const m = new THREE.Mesh(
-                new THREE.BoxGeometry(isLen ? sl : bw, bt, isLen ? bw : sl), fillMat);
+                new THREE.BoxGeometry(isLen ? sl : bw, bt, isLen ? bw : sl), mat);
             m.position.set(
                 isLen ? ro + sl / 2 : co,
                 state.deckHeight + bt / 2,
