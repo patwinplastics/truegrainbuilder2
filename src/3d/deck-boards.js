@@ -38,8 +38,6 @@ function addProfileBoard(deckGroup, state, lengthFt, x, z, runsAlongX, material)
     const geo = createBoardGeometry(lengthFt);
     const m   = new THREE.Mesh(geo, material);
     m.position.set(x, boardY(state), z);
-    // Board geometry runs along Z by default.
-    // For boards running along X, rotate 90° around Y.
     if (runsAlongX) m.rotation.y = Math.PI / 2;
     m.castShadow    = true;
     m.receiveShadow = false;
@@ -52,8 +50,6 @@ function addProfileBoard(deckGroup, state, lengthFt, x, z, runsAlongX, material)
 function createStraightBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
     const isLen = state.boardDirection === 'length';
-    // isLen=true  → boards run along deck LENGTH axis = world X
-    // isLen=false → boards run along deck WIDTH  axis = world Z
     const { runDimension: run, coverDimension: cov, numRows, segments } = state.boardLayout;
 
     for (let row = 0; row < numRows; row++) {
@@ -61,7 +57,8 @@ function createStraightBoards(deckGroup, state, colorConfig) {
         let ro = -run / 2;
         segments.forEach((seg, si) => {
             const sl  = seg.actualLength || seg.length;
-            const mat = createBoardMaterial(colorConfig, sl, !isLen, `s${row}_${si}`);
+            // true = no tex rotation; BufferGeometry V already runs along board length
+            const mat = createBoardMaterial(colorConfig, sl, true, `s${row}_${si}`);
             const cx  = isLen ? ro + sl / 2 : co;
             const cz  = isLen ? co           : ro + sl / 2;
             addProfileBoard(deckGroup, state, sl, cx, cz, isLen, mat);
@@ -73,6 +70,7 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 // ============================================================
 // Build a mitered board mesh (picture frame border).
 // Retains BufferGeometry — mitered corners cannot use profile extrusion.
+// These still use world-space UVs, so they keep the original rotation logic.
 // ============================================================
 function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, material) {
     function uv(x, z) {
@@ -128,7 +126,8 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const dW = state.deckWidth;
     const by = boardY(state);
 
-    // Mitered border boards
+    // Mitered border boards — these use buildMiteredMesh with world-space UVs,
+    // so they keep the original boardRunsAlongWidth flags for tex.rotation.
     for (let i = 0; i < bc; i++) {
         const L0 = dL / 2 - i * ew;
         const W0 = dW / 2 - i * ew;
@@ -143,7 +142,7 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         deckGroup.add(buildMiteredMesh([[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],    yBot, yTop,  L1, L0, -W0,  W0, false, mat));
     }
 
-    // Fill boards using profile geometry
+    // Fill boards using profile geometry — always true for no tex rotation
     const isLen  = state.boardDirection === 'length';
     const bwFt   = bc * ew;
     const iLen   = dL - 2 * bwFt;
@@ -154,7 +153,7 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
 
     for (let r = 0; r < nRows; r++) {
         const co  = (r * ew) - cov / 2 + bw / 2;
-        const mat = createBoardMaterial(colorConfig, run, !isLen, `pf${r}`);
+        const mat = createBoardMaterial(colorConfig, run, true, `pf${r}`);
         const cx  = isLen ? 0  : co;
         const cz  = isLen ? co : 0;
         addProfileBoard(deckGroup, state, run, cx, cz, isLen, mat);
@@ -172,8 +171,8 @@ function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
     const { runDimension: run, coverDimension: cov, numRows } = state.boardLayout;
     const bp = pattern.breakerPosition || run / 2;
 
-    // Breaker runs perpendicular to main boards
-    const bkMat = createBoardMaterial(bColor, cov, isLen, 'breaker');
+    // Breaker runs perpendicular — still true for tex, mesh rotation handles axis
+    const bkMat = createBoardMaterial(bColor, cov, true, 'breaker');
     const bkX   = isLen ? bp - run / 2 : 0;
     const bkZ   = isLen ? 0             : bp - run / 2;
     addProfileBoard(deckGroup, state, cov, bkX, bkZ, !isLen, bkMat);
@@ -185,7 +184,7 @@ function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
         const co = (row * ew) - cov / 2 + bw / 2;
         [[s1, -run / 2 + s1 / 2], [s2, run / 2 - s2 / 2]].forEach(([sl, ctr]) => {
             if (sl <= 0) return;
-            const mat = createBoardMaterial(colorConfig, sl, !isLen, `bk_${row}`);
+            const mat = createBoardMaterial(colorConfig, sl, true, `bk_${row}`);
             const cx  = isLen ? ctr : co;
             const cz  = isLen ? co  : ctr;
             addProfileBoard(deckGroup, state, sl, cx, cz, isLen, mat);
