@@ -2,6 +2,7 @@
 // TrueGrain Deck Builder 2 — Structural Elements
 // Ground, support posts, joists, fascia
 // ============================================================
+import { BOARD_PROFILE } from './board-profile.js';
 
 export function createRealisticGrass(scene) {
     const c = document.createElement('canvas');
@@ -85,8 +86,11 @@ export function createJoists(deckGroup, state) {
 }
 
 export function createWhiteFascia(deckGroup, state) {
-    const h=7.5/12, t=1/12, y=state.deckHeight-h/2;
-    const mat=new THREE.MeshStandardMaterial({color:0xFFFFFF,roughness:0.6});
+    const bt = BOARD_PROFILE.thicknessFt;
+    const h  = 7.5/12 + bt;          // joist depth + board thickness
+    const t  = 1/12;
+    const y  = state.deckHeight + bt - h/2;  // top flush with deck surface
+    const mat = new THREE.MeshStandardMaterial({color:0xFFFFFF,roughness:0.6});
     [
         [state.deckLength,h,t,          0,y,-state.deckWidth/2-t/2],
         [state.deckLength,h,t,          0,y, state.deckWidth/2+t/2],

@@ -3,10 +3,12 @@
 // Creates railings on all 4 deck edges with gaps for stairs.
 // ============================================================
 import { CONFIG } from '../config.js';
+import { BOARD_PROFILE } from './board-profile.js';
 
 export function createDetailedRailings(deckGroup, state) {
     const ph = 3, ps = 0.29, rh = 0.29, rt = 0.125, bs = 0.125, bsp = 0.33, bro = 0.25;
-    const wh  = state.deckHeight;
+    // Base Y from deck surface (top of boards), not joist level
+    const wh  = state.deckHeight + BOARD_PROFILE.thicknessFt;
     const mat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.6 });
     const pg  = new THREE.BoxGeometry(ps, ph, ps);
     const bh  = ph - rh - bro;
@@ -121,14 +123,11 @@ function splitEdgeByGaps(edge, edgeGaps) {
     if (edgeLen < 0.01) return [];
 
     // Convert gaps to t-ranges along the edge
-    // For X-axis edges, center is in X coords. For Z-axis edges, center is in Z coords.
     const tRanges = edgeGaps.map(gap => {
         let tCenter;
         if (edge.isX) {
-            // Edge runs along X. Project gap center onto X axis.
             tCenter = (gap.center - edge.s[0]) / dx;
         } else {
-            // Edge runs along Z.
             tCenter = (gap.center - edge.s[1]) / dz;
         }
         const tHalf = gap.halfWidth / edgeLen;
