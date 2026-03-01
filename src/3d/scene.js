@@ -43,15 +43,10 @@ function setupPostProcessing() {
         composer = null;
         return;
     }
-
     const container = document.getElementById('sceneContainer');
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-
     composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
-
-    const ssao = new THREE.SSAOPass(scene, camera, w, h);
+    const ssao = new THREE.SSAOPass(scene, camera, container.clientWidth, container.clientHeight);
     ssao.kernelRadius = 10;
     ssao.minDistance  = 0.001;
     ssao.maxDistance  = 0.12;
@@ -85,8 +80,6 @@ export function initScene() {
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
-
-    // Subtle atmospheric fog — adds depth to long deck views
     scene.fog = new THREE.FogExp2(0xC8DCF0, 0.008);
 
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
@@ -101,12 +94,14 @@ export function initScene() {
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
 
-    // ── Physically correct tone mapping ──────────────────────
-    renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    // ── Tone mapping ───────────────────────────────────────────
+    // LinearToneMapping keeps texture colors faithful to the source JPGs.
+    // ACES was blowing out the wood colors relative to the actual files.
+    renderer.toneMapping         = THREE.LinearToneMapping;
+    renderer.toneMappingExposure = 1.0;
     renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
-    // ── Shadows — VSM for smooth soft edges ──────────────────
+    // ── Shadows ─────────────────────────────────────────────
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type    = THREE.VSMShadowMap;
 
@@ -123,12 +118,15 @@ export function initScene() {
     controls.enableZoom    = true;
 
     // ── Lighting ─────────────────────────────────────────────
-    // Ambient — keeps shadow areas from going pure black
-    const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+    // All intensities calibrated for LinearToneMapping with sRGB textures.
+    // Rule of thumb: total diffuse contribution should sum to ~1.0–1.2.
+
+    // Ambient — fills shadows, keeps them readable not black
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambient);
 
-    // Primary sun — warm afternoon color and angle
-    const sun = new THREE.DirectionalLight(0xFFF5E0, 2.2);
+    // Primary sun — warm afternoon, moderate intensity
+    const sun = new THREE.DirectionalLight(0xFFF8F0, 0.85);
     sun.position.set(30, 40, 20);
     sun.castShadow = true;
     sun.shadow.mapSize.width  = 4096;
@@ -139,14 +137,14 @@ export function initScene() {
     scene.add(sun);
     scene.userData.sun = sun;
 
-    // Sky bounce fill — cool blue from opposite side
-    const fill = new THREE.DirectionalLight(0xB0CCE8, 0.6);
+    // Sky bounce fill — soft cool blue from opposite side
+    const fill = new THREE.DirectionalLight(0xC8DCEF, 0.25);
     fill.position.set(-20, 15, -15);
     scene.add(fill);
 
-    // Subtle ground bounce — warm light from below the deck
-    const ground = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.4);
-    scene.add(ground);
+    // Hemisphere — sky/ground gradient for natural indirect light
+    const hemi = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.3);
+    scene.add(hemi);
 
     createRealisticGrass(scene);
 

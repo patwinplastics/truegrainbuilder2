@@ -1,8 +1,7 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Material & Texture Library
 // Ultra-Realistic Rendering Edition
-// Uses existing diffuse textures only — realism from PBR
-// material settings, ACES tone mapping, and HDRI env map.
+// Uses existing diffuse textures only.
 // ============================================================
 import { CONFIG } from '../config.js';
 
@@ -10,7 +9,7 @@ export const textureCache  = {};
 export const materialCache = {};
 export const geometryCache = {};
 
-// Raised from 1024 — 2K preserves visible grain on close inspection
+// 2K cap — sharper grain on close inspection vs old 1024 cap
 const MAX_TEXTURE_SIZE = 2048;
 let maxAniso = 1;
 
@@ -52,8 +51,8 @@ export function preloadTextures() {
             CONFIG.texturePath + color.file,
             tex => {
                 downsampleTexture(tex, MAX_TEXTURE_SIZE);
-                // Mark diffuse textures as sRGB so tone mapping reads them correctly
-                tex.colorSpace = THREE.SRGBColorSpace;
+                // No colorSpace override — let Three.js use the texture as-is
+                // so rendered colors stay faithful to the source JPG files.
                 tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
                 tex.anisotropy = maxAniso;
                 textureCache[color.id] = tex;
@@ -81,9 +80,8 @@ export function disposeAllCaches() {
 }
 
 /**
- * Create (or return cached) board face material.
- * Uses the existing diffuse texture with tuned PBR roughness/metalness
- * and envMapIntensity so the HDRI environment reflects naturally.
+ * Board face material — uses existing diffuse texture with
+ * calibrated PBR roughness/metalness and envMapIntensity.
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
     const rotation = boardRunsAlongWidth ? 0 : Math.PI / 2;
@@ -92,14 +90,13 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 
     const mat = new THREE.MeshStandardMaterial({
         color:           new THREE.Color(colorConfig.hex),
-        roughness:       0.82,   // composite decking is semi-matte
+        roughness:       0.82,
         metalness:       0.0,
-        envMapIntensity: 0.55,   // subtle HDRI reflections on the surface
+        envMapIntensity: 0.4,
     });
 
     const applyTex = (src) => {
         const tex = src.clone();
-        tex.colorSpace  = THREE.SRGBColorSpace;
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         tex.anisotropy  = maxAniso;
         tex.repeat.set(1, 1);
@@ -108,7 +105,7 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
         tex.rotation    = rotation;
         tex.needsUpdate = true;
         mat.map = tex;
-        mat.color.setHex(0xFFFFFF); // let texture drive color fully
+        mat.color.setHex(0xFFFFFF);
         mat.needsUpdate = true;
     };
 
@@ -119,7 +116,6 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
             CONFIG.texturePath + colorConfig.file,
             src => {
                 downsampleTexture(src, MAX_TEXTURE_SIZE);
-                src.colorSpace = THREE.SRGBColorSpace;
                 src.wrapS = src.wrapT = THREE.RepeatWrapping;
                 src.anisotropy = maxAniso;
                 textureCache[colorConfig.id] = src;
@@ -133,8 +129,7 @@ export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWi
 }
 
 /**
- * Create (or return cached) end-cap material.
- * Slightly darker and more matte than the face — mimics a cut composite edge.
+ * End-cap material — slightly darker and more matte than the face.
  */
 export function createCapMaterial(colorConfig) {
     const key = `cap_${colorConfig.id}`;
@@ -143,7 +138,7 @@ export function createCapMaterial(colorConfig) {
         color:           new THREE.Color(colorConfig.hex).multiplyScalar(0.80),
         roughness:       0.94,
         metalness:       0.0,
-        envMapIntensity: 0.15,
+        envMapIntensity: 0.1,
     });
     materialCache[key] = mat;
     return mat;
