@@ -1,6 +1,6 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Stair 3D Geometry
-// v4 — handrails rewritten with endpoint lookAt (no Euler bugs)
+// v4.1 — flight 2 origin aligned to landing center + side edge
 // ============================================================
 import { CONFIG }              from '../config.js';
 import { state }               from '../state.js';
@@ -90,8 +90,6 @@ function addBox(parent, mat, w, h, d, x, y, z) {
     parent.add(m);
 }
 
-// Create a bar (thin box) connecting two 3D points using lookAt
-// BoxGeometry depth (Z) = length, so lookAt aligns the bar correctly
 function makeBar(parent, mat, x1, y1, z1, x2, y2, z2, thickness) {
     const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
     const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
@@ -210,6 +208,18 @@ function buildStraightStair(sc, dims, g, cc, st) {
 
 // ============================================================
 // L-Shaped stair
+//
+//  Coordinate model (local group space, before positionStairGroup):
+//    Origin (0,0,0) = deck edge attachment point at deck surface Y
+//    Flight 1: travels in -Z from origin
+//    Landing:  square pad sw x sw
+//       near edge Z = -run1Feet
+//       far  edge Z = -(run1Feet + sw)
+//       center    Z = -(run1Feet + sw/2)
+//       spans X from -sw/2 to +sw/2
+//    Flight 2: exits from side edge of landing, travels in sign*X
+//       originX = sign * sw/2   (side edge)
+//       originZ = landing center Z  (treads centered on landing)
 // ============================================================
 function buildLShapedStair(sc, dims, g, cc, st) {
     const ld   = dims.lShapedData;
@@ -222,7 +232,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     const rise2    = ld.risersAfterLanding  * rps;
     const landingY = st.deckHeight - rise1;
 
-    // Flight 1
+    // Flight 1: deck edge down to landing
     buildFlightTreads({
         stairConfig: sc, dims, colorConfig: cc, parentGroup: g,
         numTreads: ld.treadsBeforeLanding, risePerStep: rps,
@@ -237,7 +247,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
         originX: 0, originZ: 0
     });
 
-    // Landing pad
+    // Landing pad (square sw x sw)
     const landingCenterZ = -(ld.run1Feet + sw / 2);
     buildLanding({
         parentGroup: g, colorConfig: cc,
@@ -250,9 +260,11 @@ function buildLShapedStair(sc, dims, g, cc, st) {
         landingY, riserZ: -ld.run1Feet
     });
 
-    // Flight 2
-    const f2originX = 0;
-    const f2originZ = -(ld.run1Feet + sw);
+    // Flight 2: exits from side edge of landing, runs in sign*X
+    //   originX = side edge of landing (sign * sw/2)
+    //   originZ = center of landing in Z (treads span sw in Z, centered here)
+    const f2originX = sign * sw / 2;
+    const f2originZ = landingCenterZ;
     buildFlightTreads({
         stairConfig: sc, dims, colorConfig: cc, parentGroup: g,
         numTreads: ld.treadsAfterLanding, risePerStep: rps,
@@ -350,12 +362,10 @@ function buildFlightTreads(p) {
 // buildFlightStringers
 // ============================================================
 function buildFlightStringers(p) {
-    const sLen  = Math.sqrt(p.riseFt * p.riseFt + p.runFt * p.runFt);
     const runsX = Math.abs(p.dirX) > 0.5;
     const mat   = stringerMat();
 
     getStringerPositions(p.stairWidthFt).forEach(({ lat, yOff }) => {
-        // Compute start (top) and end (bottom) positions for this stringer
         let x1, y1, z1, x2, y2, z2;
         const topY = p.startY + yOff;
         const botY = p.startY - p.riseFt + yOff;
@@ -370,7 +380,6 @@ function buildFlightStringers(p) {
         y1 = topY;
         y2 = botY;
 
-        // Use makeBar for stringers too (wider cross section)
         const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
         const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
         if (len < 0.01) return;
@@ -384,34 +393,22 @@ function buildFlightStringers(p) {
 }
 
 // ============================================================
-// buildFlightHandrails (v4 rewrite)
-//
-// Uses explicit endpoint coordinates + lookAt for all diagonal
-// elements. No Euler rotation math. Guarantees correct geometry
-// for both runsZ and runsX flights.
-//
-// Components per side:
-//   - Top post (at deck/landing edge)
-//   - Bottom post (at ground/lower end)
-//   - Top rail (diagonal bar connecting post tops)
-//   - Bottom rail (diagonal bar ~4" above step surface)
-//   - Balusters (vertical, evenly spaced, constant height)
+// buildFlightHandrails (v4)
 // ============================================================
 function buildFlightHandrails(p) {
     const mat = handrailMat();
-    const RAIL_H   = 3;       // handrail height above step surface (ft)
-    const BOT_RAIL = 0.33;    // bottom rail height above step surface (ft)
-    const POST_SZ  = 0.29;    // post cross-section (ft)
-    const RAIL_TH  = 0.15;    // rail bar thickness (ft)
-    const BAL_SZ   = 0.10;    // baluster cross-section (ft)
-    const BAL_SP   = 0.33;    // baluster spacing along run (ft)
+    const RAIL_H   = 3;
+    const BOT_RAIL = 0.33;
+    const POST_SZ  = 0.29;
+    const RAIL_TH  = 0.15;
+    const BAL_SZ   = 0.10;
+    const BAL_SP   = 0.33;
     const runsX    = Math.abs(p.dirX) > 0.5;
     const endY     = p.startY - p.riseFt;
 
     [-1, 1].forEach(side => {
         const lat = side * p.stairWidthFt / 2;
 
-        // World positions of the top-of-stair and bottom-of-stair for this side
         let topX, topZ, botX, botZ;
         if (runsX) {
             topX = p.originX;                    topZ = p.originZ + lat;
@@ -421,29 +418,27 @@ function buildFlightHandrails(p) {
             botX = p.originX + lat; botZ = p.originZ + p.dirZ * p.runFt;
         }
 
-        // ---- Posts (vertical boxes) ----
+        // Posts
         addBox(p.parentGroup, mat, POST_SZ, RAIL_H, POST_SZ,
                topX, p.startY + RAIL_H / 2, topZ);
         addBox(p.parentGroup, mat, POST_SZ, RAIL_H, POST_SZ,
                botX, endY + RAIL_H / 2, botZ);
 
-        // ---- Top rail (connects tops of posts diagonally) ----
+        // Top rail
         makeBar(p.parentGroup, mat,
             topX, p.startY + RAIL_H, topZ,
             botX, endY     + RAIL_H, botZ,
             RAIL_TH
         );
 
-        // ---- Bottom rail (follows slope, BOT_RAIL above step surface) ----
+        // Bottom rail
         makeBar(p.parentGroup, mat,
             topX, p.startY + BOT_RAIL, topZ,
             botX, endY     + BOT_RAIL, botZ,
             RAIL_TH
         );
 
-        // ---- Balusters (vertical, evenly spaced) ----
-        // Since top rail and step surface have the same slope,
-        // every baluster is exactly (RAIL_H - BOT_RAIL) tall.
+        // Balusters
         const balH  = RAIL_H - BOT_RAIL;
         const nBal  = Math.max(1, Math.floor(p.runFt / BAL_SP));
         for (let b = 1; b < nBal; b++) {
