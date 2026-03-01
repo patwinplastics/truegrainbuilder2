@@ -50,12 +50,15 @@ export function disposeAllCaches() {
  * Without rotation: image-Y (grain) -> V -> world Z.
  * With PI/2 rotation: image-Y (grain) -> world X.
  *
- * Boards along X: rotate PI/2 so grain aligns with X.
- * Boards along Z: no rotation, grain already aligns with Z.
+ * Boards along X: boardRunsAlongWidth=false -> rotation=PI/2 -> grain aligns with X.
+ * Boards along Z: boardRunsAlongWidth=true  -> rotation=0    -> grain aligns with Z.
+ *
+ * uniqueId is included in the cache key to allow the same color to be cached
+ * separately for different orientations (e.g. bframe0_h vs bframe0_v).
  */
 export function createBoardMaterial(colorConfig, boardLengthFt, boardRunsAlongWidth, uniqueId = '') {
     const rotation = boardRunsAlongWidth ? 0 : Math.PI / 2;
-    const key = `board_${colorConfig.id}_${rotation.toFixed(2)}`;
+    const key = `board_${colorConfig.id}_${rotation.toFixed(2)}_${uniqueId}`;
     if (materialCache[key]) return materialCache[key];
 
     const mat = new THREE.MeshStandardMaterial({

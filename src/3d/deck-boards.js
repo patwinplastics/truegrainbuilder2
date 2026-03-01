@@ -58,8 +58,8 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 //   if swapUV: final [u,v] = [base_v, base_u]
 //   else:      final [u,v] = [base_u, base_v]
 //
-// All mitered boards use tex.rotation=0 via boardRunsAlongWidth=true.
-// Grain direction is controlled entirely by swapUV in the geometry.
+// matH (boardRunsAlongWidth=false, rotation=PI/2): grain along world-X -> FRONT/BACK
+// matV (boardRunsAlongWidth=true,  rotation=0):    grain along world-Z -> LEFT/RIGHT
 // ============================================================
 function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, material) {
     function uv(x, z) {
@@ -119,10 +119,8 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const dL = state.deckLength;
     const dW = state.deckWidth;
 
-    // All mitered border boards use boardRunsAlongWidth=true so
-    // tex.rotation=0. Grain direction is handled by swapUV in geometry.
-    // FRONT/BACK run along X -> swapUV=false -> grain along X
-    // LEFT/RIGHT run along Z -> swapUV=true  -> grain along Z
+    // matH: FRONT/BACK run along world-X -> boardRunsAlongWidth=false -> rotation=PI/2
+    // matV: LEFT/RIGHT run along world-Z -> boardRunsAlongWidth=true  -> rotation=0
     for (let i = 0; i < bc; i++) {
         const L0 = dL / 2 - i * ew;
         const W0 = dW / 2 - i * ew;
@@ -132,27 +130,29 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         const yTop = state.deckHeight + bt;
         const xMin = -L0, xMax = L0;
         const zMin = -W0, zMax = W0;
-        const mat = createBoardMaterial(bColor, dL, true, `bframe${i}`);
 
-        // FRONT
+        const matH = createBoardMaterial(bColor, dL, false, `bframe${i}_h`);
+        const matV = createBoardMaterial(bColor, dW, true,  `bframe${i}_v`);
+
+        // FRONT (runs along X -> matH, swapUV=false)
         deckGroup.add(buildMiteredMesh(
             [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, false, mat
+            yBot, yTop, xMin, xMax, zMin, zMax, false, matH
         ));
-        // BACK
+        // BACK (runs along X -> matH, swapUV=false)
         deckGroup.add(buildMiteredMesh(
             [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, false, mat
+            yBot, yTop, xMin, xMax, zMin, zMax, false, matH
         ));
-        // LEFT (perpendicular -> swapUV=true)
+        // LEFT (runs along Z -> matV, swapUV=true)
         deckGroup.add(buildMiteredMesh(
             [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, true, mat
+            yBot, yTop, xMin, xMax, zMin, zMax, true, matV
         ));
-        // RIGHT (perpendicular -> swapUV=true)
+        // RIGHT (runs along Z -> matV, swapUV=true)
         deckGroup.add(buildMiteredMesh(
             [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
-            yBot, yTop, xMin, xMax, zMin, zMax, true, mat
+            yBot, yTop, xMin, xMax, zMin, zMax, true, matV
         ));
     }
 
