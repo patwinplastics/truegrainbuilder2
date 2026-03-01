@@ -6,7 +6,8 @@
 // Toggles cleanly with OrbitControls — no scene rebuild needed.
 // ============================================================
 
-import { state } from '../state.js';
+import { CONFIG } from '../config.js';
+import { state }  from '../state.js';
 import { calculateStairDimensions } from './stairs-3d.js';
 
 // ── Constants ────────────────────────────────────────────────
@@ -15,6 +16,7 @@ const MOVE_SPEED  = 0.07;   // units per frame
 const GRAVITY     = 0.012;  // downward pull per frame
 const SNAP_THRESH = 0.18;   // snap-to-surface tolerance
 const GROUND_Y    = 0.0;    // world ground level
+const BOARD_TH    = CONFIG.boards.thickness / 12;  // board thickness in feet
 
 // ── Module state ─────────────────────────────────────────────
 let _camera    = null;
@@ -25,7 +27,7 @@ let _plc       = null;   // PointerLockControls instance
 
 const _keys  = { w: false, s: false, a: false, d: false };
 let _velY    = 0;        // vertical velocity (for step-climbing smoothing)
-let _surfaces = [];      // [{minX,maxX,minZ,maxZ,y,isStair,stepData}]
+let _surfaces = [];      // [{minX,maxX,minZ,maxZ,y}]
 
 // ── Public API ───────────────────────────────────────────────
 
@@ -161,8 +163,6 @@ function _removeKeyListeners() { window.removeEventListener('keydown', _keyDown)
 /**
  * Builds a flat list of axis-aligned walkable surface boxes:
  *   deck platform, each stair tread, each landing.
- * Stair surfaces form a ramp-like cascade so the camera
- * smoothly steps up/down via the gravity/snap system.
  */
 function _buildSurfaces() {
     _surfaces = [];
@@ -190,37 +190,29 @@ function _buildSurfaces() {
 
 /**
  * Converts a stair config + dims into per-tread surface entries.
- * Each tread is a thin horizontal slab the player can stand on.
- * Positions must match positionStairGroup() rotation logic from stairs-3d.js.
+ * Positions mirror positionStairGroup() rotation logic in stairs-3d.js.
  */
 function _addStairSurfaces(sc, dims) {
-    const edge  = sc.edge   || 'front';
-    const pos   = sc.pos    || sc.position || 0.5;
+    const edge  = sc.edge     || 'front';
+    const pos   = sc.pos      || sc.position || 0.5;
     const swH   = dims.stairWidthFeet / 2;
     const tdf   = dims.treadDepth / 12;
     const rps   = dims.actualRise / 12;
-    const bpt   = CONFIG?.boards?.thickness / 12 || (1 / 12);
 
-    // Translate stair local coords → world coords based on edge
     const toWorld = _makeEdgeTransform(edge, pos, state);
 
     if (sc.shape === 'l-shaped' && dims.lShapedData) {
-        const ld     = dims.lShapedData;
-        const sign   = ld.turnDirection === 'left' ? -1 : 1;
-        const rbl    = ld.risersBeforeLanding;
-        const landY  = state.deckHeight - rbl * rps;
+        const ld    = dims.lShapedData;
+        const sign  = ld.turnDirection === 'left' ? -1 : 1;
+        const rbl   = ld.risersBeforeLanding;
+        const landY = state.deckHeight - rbl * rps;
 
-        // Flight 1 treads (dirZ = -1, dirX = 0 in local space)
+        // Flight 1 treads
         for (let i = 0; i < ld.treadsBeforeLanding; i++) {
-            const stepY  = state.deckHeight - (i + 1) * rps + bpt;
+            const stepY  = state.deckHeight - (i + 1) * rps + BOARD_TH;
             const localZ = -((i + 1) * tdf);
-            const localX = 0;
-            const c      = toWorld(localX, localZ);
-            _surfaces.push({
-                minX: c.x - swH, maxX: c.x + swH,
-                minZ: c.z - tdf, maxZ: c.z + tdf,
-                y:    stepY
-            });
+            const c      = toWorld(0, localZ);
+            _surfaces.push({ minX: c.x - swH, maxX: c.x + swH, minZ: c.z - tdf, maxZ: c.z + tdf, y: stepY });
         }
 
         // Landing
@@ -231,71 +223,60 @@ function _addStairSurfaces(sc, dims) {
         _surfaces.push({
             minX: cl.x - lw / 2, maxX: cl.x + lw / 2,
             minZ: cl.z - ldf / 2, maxZ: cl.z + ldf / 2,
-            y:    landY + bpt
+            y: landY + BOARD_TH
         });
 
-        // Flight 2 treads (dirX = sign, dirZ = 0)
+        // Flight 2 treads
         const ox = 0, oz = -(ld.run1Feet + ldf);
         for (let i = 0; i < ld.treadsAfterLanding; i++) {
-            const stepY   = landY - (i + 1) * rps + bpt;
+            const stepY   = landY - (i + 1) * rps + BOARD_TH;
             const localX2 = sign * ((i + 1) * tdf);
             const c2      = toWorld(ox + localX2, oz);
-            _surfaces.push({
-                minX: c2.x - swH, maxX: c2.x + swH,
-                minZ: c2.z - swH, maxZ: c2.z + swH,
-                y:    stepY
-            });
+            _surfaces.push({ minX: c2.x - swH, maxX: c2.x + swH, minZ: c2.z - swH, maxZ: c2.z + swH, y: stepY });
         }
     } else {
-        // Straight stair — dirZ = -1 in local space (away from deck)
+        // Straight stair
         for (let i = 0; i < dims.numTreads; i++) {
-            const stepY  = state.deckHeight - (i + 1) * rps + bpt;
+            const stepY  = state.deckHeight - (i + 1) * rps + BOARD_TH;
             const localZ = -((i + 1) * tdf);
             const c      = toWorld(0, localZ);
-            _surfaces.push({
-                minX: c.x - swH, maxX: c.x + swH,
-                minZ: c.z - tdf, maxZ: c.z + tdf,
-                y:    stepY
-            });
+            _surfaces.push({ minX: c.x - swH, maxX: c.x + swH, minZ: c.z - tdf, maxZ: c.z + tdf, y: stepY });
         }
     }
 }
 
 /**
- * Returns a function (localX, localZ) => {x, z} that mirrors
- * positionStairGroup() from stairs-3d.js.
+ * Returns a transform fn (localX, localZ) => {x, z} mirroring
+ * positionStairGroup() rotation from stairs-3d.js.
  */
 function _makeEdgeTransform(edge, posNorm, st) {
-    const EDGE_OFFSET = (1 / 12); // matches BOARD_TH offset in stairs-3d.js
+    const EDGE_OFFSET = BOARD_TH;
     let ox = 0, oz = 0;
     switch (edge) {
-        case 'front': ox = (posNorm - 0.5) * st.deckLength; oz = st.deckWidth / 2 + EDGE_OFFSET; break;
-        case 'back':  ox = (posNorm - 0.5) * st.deckLength; oz = -(st.deckWidth / 2 + EDGE_OFFSET); break;
+        case 'front': ox = (posNorm - 0.5) * st.deckLength; oz =  st.deckWidth  / 2 + EDGE_OFFSET; break;
+        case 'back':  ox = (posNorm - 0.5) * st.deckLength; oz = -(st.deckWidth  / 2 + EDGE_OFFSET); break;
         case 'left':  ox = -(st.deckLength / 2 + EDGE_OFFSET); oz = (posNorm - 0.5) * st.deckWidth; break;
-        case 'right': ox = st.deckLength / 2 + EDGE_OFFSET;   oz = (posNorm - 0.5) * st.deckWidth; break;
+        case 'right': ox =   st.deckLength / 2 + EDGE_OFFSET;  oz = (posNorm - 0.5) * st.deckWidth; break;
     }
     return (lx, lz) => {
-        // Rotate local → world based on edge (matches rotY in stairs-3d.js)
         switch (edge) {
-            case 'front': return { x: ox + lx,  z: oz - lz };  // rotY = PI
-            case 'back':  return { x: ox + lx,  z: oz + lz };  // rotY = 0
-            case 'left':  return { x: ox + lz,  z: oz + lx };  // rotY = PI/2
-            case 'right': return { x: ox - lz,  z: oz + lx };  // rotY = -PI/2
+            case 'front': return { x: ox + lx,  z: oz - lz };
+            case 'back':  return { x: ox + lx,  z: oz + lz };
+            case 'left':  return { x: ox + lz,  z: oz + lx };
+            case 'right': return { x: ox - lz,  z: oz + lx };
         }
     };
 }
 
 /**
- * Returns the highest walkable surface Y at world position (x, z).
- * Checks surfaces sorted from highest to lowest.
+ * Returns the highest walkable surface Y at world (x, z).
  */
 function _getSurfaceY(x, z) {
     let best = GROUND_Y;
-    // Sort descending by y so we get the highest matching surface
     const sorted = [..._surfaces].sort((a, b) => b.y - a.y);
     for (const s of sorted) {
         if (x >= s.minX && x <= s.maxX && z >= s.minZ && z <= s.maxZ) {
-            if (s.y > best || best === GROUND_Y) best = s.y;
+            best = s.y;
             break;
         }
     }
@@ -303,8 +284,7 @@ function _getSurfaceY(x, z) {
 }
 
 /**
- * Determine a good starting position — top of first stair if
- * stairs exist, otherwise center of deck surface.
+ * Good starting position — top of first stair or deck center.
  */
 function _getStartPosition() {
     const dH = state.deckHeight;
@@ -314,7 +294,7 @@ function _getStartPosition() {
             const dims = calculateStairDimensions(sc, state);
             if (dims?.isValid) {
                 const edge = sc.edge || 'front';
-                const pos  = sc.pos || sc.position || 0.5;
+                const pos  = sc.pos  || sc.position || 0.5;
                 const fn   = _makeEdgeTransform(edge, pos, state);
                 const c    = fn(0, -(dims.treadDepth / 12 * 0.5));
                 return { x: c.x, y: dH + EYE_HEIGHT, z: c.z };
@@ -325,11 +305,10 @@ function _getStartPosition() {
 }
 
 /**
- * Keep player within a generous bounding box around the whole deck area,
- * including stair run-out zones.
+ * Clamp player within deck + max stair run-out bounding box.
  */
 function _clampToBounds(pos) {
-    const maxStairRun = 20; // maximum possible stair run in feet
+    const maxStairRun = 20;
     const pad = 2;
     const minX = -state.deckLength / 2 - maxStairRun - pad;
     const maxX =  state.deckLength / 2 + maxStairRun + pad;
