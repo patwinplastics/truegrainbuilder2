@@ -2,9 +2,9 @@
 // TrueGrain Deck Builder 2 — Deck Board Geometry
 // Straight, picture-frame (mitered), and breaker-board patterns
 // ============================================================
-import { CONFIG }               from '../config.js';
-import { createBoardMaterial }  from './materials.js';
-import { createBoardGeometry }  from './board-profile.js';
+import { CONFIG }              from '../config.js';
+import { createBoardMaterial } from './materials.js';
+import { createBoardGeometry, BOARD_PROFILE } from './board-profile.js';
 
 function dims() {
     const bw = CONFIG.boards.width     / 12;
@@ -13,9 +13,11 @@ function dims() {
     return { bw, bt, g, ew: bw + g };
 }
 
-// Compute length segments so each sub-quad is roughly square.
-function boardSegs(lengthFt, widthFt) {
-    return Math.max(1, Math.ceil(lengthFt / widthFt));
+// Boards sit ON TOP of state.deckHeight (which is joist-top).
+// Mesh pivot is at the board top surface, so lift by one board thickness
+// to clear the joist surface and eliminate z-fighting.
+function boardY(state) {
+    return state.deckHeight + BOARD_PROFILE.thicknessFt;
 }
 
 export function createDeckBoardsWithSegments(deckGroup, state, pattern, colorConfig) {
@@ -26,14 +28,32 @@ export function createDeckBoardsWithSegments(deckGroup, state, pattern, colorCon
 }
 
 // ============================================================
-// Straight boards — profiled ExtrudeGeometry from DXF
+// Helpers
+// ============================================================
+function boardSegs(lengthFt, widthFt) {
+    return Math.max(1, Math.ceil(lengthFt / widthFt));
+}
+
+function addProfileBoard(deckGroup, state, lengthFt, x, z, runsAlongX, material) {
+    const geo = createBoardGeometry(lengthFt);
+    const m   = new THREE.Mesh(geo, material);
+    m.position.set(x, boardY(state), z);
+    // Board geometry runs along Z by default.
+    // For boards running along X, rotate 90° around Y.
+    if (runsAlongX) m.rotation.y = Math.PI / 2;
+    m.castShadow    = true;
+    m.receiveShadow = false;
+    deckGroup.add(m);
+}
+
+// ============================================================
+// Straight boards
 // ============================================================
 function createStraightBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
-    // Y position: top of board flush with deckHeight surface.
-    // createBoardGeometry() sets Y=0 as the board top, so we place at deckHeight.
-    const boardY  = state.deckHeight;
-    const isLen   = state.boardDirection === 'length';
+    const isLen = state.boardDirection === 'length';
+    // isLen=true  → boards run along deck LENGTH axis = world X
+    // isLen=false → boards run along deck WIDTH  axis = world Z
     const { runDimension: run, coverDimension: cov, numRows, segments } = state.boardLayout;
 
     for (let row = 0; row < numRows; row++) {
@@ -42,22 +62,9 @@ function createStraightBoards(deckGroup, state, colorConfig) {
         segments.forEach((seg, si) => {
             const sl  = seg.actualLength || seg.length;
             const mat = createBoardMaterial(colorConfig, sl, !isLen, `s${row}_${si}`);
-            const geo = createBoardGeometry(sl);
-            const m   = new THREE.Mesh(geo, mat);
-
-            if (isLen) {
-                // Board runs along X: extrusion is along Z by default,
-                // so rotate 90° around Y to align with X.
-                m.rotation.y = Math.PI / 2;
-                m.position.set(ro + sl / 2, boardY, co);
-            } else {
-                // Board runs along Z: extrusion already along Z, no rotation.
-                m.position.set(co, boardY, ro + sl / 2);
-            }
-
-            m.castShadow    = true;
-            m.receiveShadow = false;
-            deckGroup.add(m);
+            const cx  = isLen ? ro + sl / 2 : co;
+            const cz  = isLen ? co           : ro + sl / 2;
+            addProfileBoard(deckGroup, state, sl, cx, cz, isLen, mat);
             ro += sl + g;
         });
     }
@@ -65,7 +72,7 @@ function createStraightBoards(deckGroup, state, colorConfig) {
 
 // ============================================================
 // Build a mitered board mesh (picture frame border).
-// Retains BufferGeometry — mitered corners cannot use the profile extrusion.
+// Retains BufferGeometry — mitered corners cannot use profile extrusion.
 // ============================================================
 function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, material) {
     function uv(x, z) {
@@ -73,7 +80,6 @@ function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, mater
         const bv = (z - zMin) / (zMax - zMin);
         return swapUV ? [bv, bu] : [bu, bv];
     }
-
     const positions = [
         [pts[0][0], yBot, pts[0][1]],
         [pts[1][0], yBot, pts[1][1]],
@@ -84,27 +90,22 @@ function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, mater
         [pts[2][0], yTop, pts[2][1]],
         [pts[3][0], yTop, pts[3][1]],
     ];
-
     const uvMap = positions.map(p => uv(p[0], p[2]));
-
     const triangles = [
-        [4, 6, 5], [4, 7, 6],   // top
-        [0, 1, 2], [0, 2, 3],   // bottom
-        [0, 5, 1], [0, 4, 5],   // outer edge
-        [1, 6, 2], [1, 5, 6],   // right miter
-        [2, 7, 3], [2, 6, 7],   // inner edge
-        [3, 4, 0], [3, 7, 4],   // left miter
+        [4, 6, 5], [4, 7, 6],
+        [0, 1, 2], [0, 2, 3],
+        [0, 5, 1], [0, 4, 5],
+        [1, 6, 2], [1, 5, 6],
+        [2, 7, 3], [2, 6, 7],
+        [3, 4, 0], [3, 7, 4],
     ];
-
-    const posArr = [];
-    const uvArr  = [];
+    const posArr = [], uvArr = [];
     for (const [a, b, c] of triangles) {
         for (const vi of [a, b, c]) {
             posArr.push(...positions[vi]);
             uvArr.push(...uvMap[vi]);
         }
     }
-
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArr), 3));
     geom.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(uvArr),  2));
@@ -116,8 +117,7 @@ function buildMiteredMesh(pts, yBot, yTop, xMin, xMax, zMin, zMax, swapUV, mater
 }
 
 // ============================================================
-// Picture frame — mitered border retains BoxGeometry / BufferGeometry,
-// fill boards use the DXF profile.
+// Picture frame
 // ============================================================
 function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const { bw, bt, g, ew } = dims();
@@ -126,36 +126,24 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
         : (CONFIG.colors.find(c => c.id === state.borderColor) || colorConfig);
     const dL = state.deckLength;
     const dW = state.deckWidth;
+    const by = boardY(state);
 
-    // --- Mitered border boards (BoxGeometry intentional — no profile on borders) ---
+    // Mitered border boards
     for (let i = 0; i < bc; i++) {
         const L0 = dL / 2 - i * ew;
         const W0 = dW / 2 - i * ew;
         const L1 = L0 - bw;
         const W1 = W0 - bw;
-        const yBot = state.deckHeight;
-        const yTop = state.deckHeight + bt;
+        const yBot = by - bt;
+        const yTop = by;
         const mat = createBoardMaterial(bColor, dL, true, `bframe${i}`);
-
-        deckGroup.add(buildMiteredMesh(
-            [[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]],
-            yBot, yTop, -L0, L0, -W0, -W1, true, mat
-        ));
-        deckGroup.add(buildMiteredMesh(
-            [[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],
-            yBot, yTop, -L0, L0, W1, W0, true, mat
-        ));
-        deckGroup.add(buildMiteredMesh(
-            [[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],
-            yBot, yTop, -L0, -L1, -W0, W0, false, mat
-        ));
-        deckGroup.add(buildMiteredMesh(
-            [[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],
-            yBot, yTop, L1, L0, -W0, W0, false, mat
-        ));
+        deckGroup.add(buildMiteredMesh([[-L0,-W0],[L0,-W0],[L1,-W1],[-L1,-W1]], yBot, yTop, -L0, L0, -W0, -W1, true, mat));
+        deckGroup.add(buildMiteredMesh([[L0,W0],[-L0,W0],[-L1,W1],[L1,W1]],    yBot, yTop, -L0, L0,  W1,  W0, true, mat));
+        deckGroup.add(buildMiteredMesh([[-L0,W0],[-L0,-W0],[-L1,-W1],[-L1,W1]],yBot, yTop, -L0,-L1, -W0,  W0, false, mat));
+        deckGroup.add(buildMiteredMesh([[L0,-W0],[L0,W0],[L1,W1],[L1,-W1]],    yBot, yTop,  L1, L0, -W0,  W0, false, mat));
     }
 
-    // --- Fill boards — profiled ExtrudeGeometry from DXF ---
+    // Fill boards using profile geometry
     const isLen  = state.boardDirection === 'length';
     const bwFt   = bc * ew;
     const iLen   = dL - 2 * bwFt;
@@ -163,75 +151,44 @@ function createPictureFrameBoards(deckGroup, state, colorConfig) {
     const run    = isLen ? iLen : iWid;
     const cov    = isLen ? iWid : iLen;
     const nRows  = Math.ceil(cov / ew);
-    const boardY = state.deckHeight;
 
     for (let r = 0; r < nRows; r++) {
         const co  = (r * ew) - cov / 2 + bw / 2;
         const mat = createBoardMaterial(colorConfig, run, !isLen, `pf${r}`);
-        const geo = createBoardGeometry(run);
-        const m   = new THREE.Mesh(geo, mat);
-
-        if (isLen) {
-            m.rotation.y = Math.PI / 2;
-            m.position.set(0, boardY, co);
-        } else {
-            m.position.set(co, boardY, 0);
-        }
-
-        m.castShadow    = true;
-        m.receiveShadow = false;
-        deckGroup.add(m);
+        const cx  = isLen ? 0  : co;
+        const cz  = isLen ? co : 0;
+        addProfileBoard(deckGroup, state, run, cx, cz, isLen, mat);
     }
 }
 
 // ============================================================
-// Breaker boards — all boards use DXF profile
+// Breaker boards
 // ============================================================
 function createBreakerBoards(deckGroup, state, pattern, colorConfig) {
     const { bw, bt, g, ew } = dims();
-    const boardY  = state.deckHeight;
-    const isLen   = state.boardDirection === 'length';
-    const bColor  = state.breakerSameColor ? colorConfig
+    const isLen  = state.boardDirection === 'length';
+    const bColor = state.breakerSameColor ? colorConfig
         : (CONFIG.colors.find(c => c.id === state.breakerColor) || colorConfig);
     const { runDimension: run, coverDimension: cov, numRows } = state.boardLayout;
     const bp = pattern.breakerPosition || run / 2;
 
-    // Breaker board (runs perpendicular to main boards)
-    const breakerGeo = createBoardGeometry(cov);
-    const br = new THREE.Mesh(breakerGeo, createBoardMaterial(bColor, cov, isLen, 'breaker'));
-    if (isLen) {
-        // Breaker runs along Z when main boards run along X
-        br.position.set(bp - run / 2, boardY, 0);
-    } else {
-        br.rotation.y = Math.PI / 2;
-        br.position.set(0, boardY, bp - run / 2);
-    }
-    br.castShadow    = true;
-    br.receiveShadow = false;
-    deckGroup.add(br);
+    // Breaker runs perpendicular to main boards
+    const bkMat = createBoardMaterial(bColor, cov, isLen, 'breaker');
+    const bkX   = isLen ? bp - run / 2 : 0;
+    const bkZ   = isLen ? 0             : bp - run / 2;
+    addProfileBoard(deckGroup, state, cov, bkX, bkZ, !isLen, bkMat);
 
-    // Two segments on either side of breaker
     const s1 = bp - bw / 2 - g;
     const s2 = run - bp - bw / 2 - g;
 
     for (let row = 0; row < numRows; row++) {
         const co = (row * ew) - cov / 2 + bw / 2;
-        [[s1, -run / 2 + s1 / 2], [s2, run / 2 - s2 / 2]].forEach(([sl, ctr], si) => {
+        [[s1, -run / 2 + s1 / 2], [s2, run / 2 - s2 / 2]].forEach(([sl, ctr]) => {
             if (sl <= 0) return;
-            const geo = createBoardGeometry(sl);
-            const m   = new THREE.Mesh(
-                geo,
-                createBoardMaterial(colorConfig, sl, !isLen, `bk${si}_${row}`)
-            );
-            if (isLen) {
-                m.rotation.y = Math.PI / 2;
-                m.position.set(ctr, boardY, co);
-            } else {
-                m.position.set(co, boardY, ctr);
-            }
-            m.castShadow    = true;
-            m.receiveShadow = false;
-            deckGroup.add(m);
+            const mat = createBoardMaterial(colorConfig, sl, !isLen, `bk_${row}`);
+            const cx  = isLen ? ctr : co;
+            const cz  = isLen ? co  : ctr;
+            addProfileBoard(deckGroup, state, sl, cx, cz, isLen, mat);
         });
     }
 }
