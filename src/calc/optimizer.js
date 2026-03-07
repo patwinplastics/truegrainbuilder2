@@ -12,6 +12,15 @@ export function calculateOptimalBoardLayout(state) {
     const effectiveWidth = boardWidthFt + gapFt;
     const numRows        = Math.ceil(coverDim / effectiveWidth);
 
+    // ---- Trim detection ----
+    // The leading edge of the last row sits at: (numRows - 1) * effectiveWidth
+    // Its far edge without trimming would be at: (numRows - 1) * effectiveWidth + boardWidthFt
+    // If that overshoots coverDim the board must be ripped down.
+    const lastRowLeadingEdge = (numRows - 1) * effectiveWidth;
+    const fullLastRowFarEdge = lastRowLeadingEdge + boardWidthFt;
+    const lastRowTrimmed     = fullLastRowFarEdge > coverDim + 1e-6;
+    const lastRowWidthFt     = lastRowTrimmed ? (coverDim - lastRowLeadingEdge) : boardWidthFt;
+
     const combinations = findBoardCombinations(runDim);
     combinations.sort((a, b) => a.wastePercent - b.wastePercent);
 
@@ -32,7 +41,11 @@ export function calculateOptimalBoardLayout(state) {
         wastePercent:    best.wastePercent,
         totalLinealFeet: Object.entries(boardsByLength).reduce((s, [l, c]) => s + c * +l, 0),
         usedLinealFeet:  numRows * runDim,
-        recommendations: combinations.slice(0, 3)
+        recommendations: combinations.slice(0, 3),
+        // Trim metadata
+        lastRowTrimmed,
+        lastRowWidthFt,
+        lastRowWidthIn:  lastRowWidthFt * 12
     };
 }
 

@@ -13,6 +13,7 @@ export function updateUI(s) {
         updateEstimateSummary(s);
         updateReviewSummary(s);
     }
+    updateTrimNotice(s);
     buildDeck();
     document.getElementById('buildingSpinner')?.classList.add('hidden');
 }
@@ -30,6 +31,99 @@ function updatePatternUI(s) {
     toggleHidden('breakerColorSection', !br || s.breakerSameColor);
     toggleHidden('borderColorSection',  !bp || s.borderSameColor);
     toggleHidden('borderWidthSection',  !bp);
+}
+
+// ============================================================
+// Trim notice banner
+// Rendered into #trimNotice if it exists in the HTML, otherwise
+// injected dynamically just above the 3D viewport.
+// ============================================================
+function updateTrimNotice(s) {
+    const lo = s.boardLayout;
+
+    // Determine whether ANY trim is needed (straight / breaker use
+    // the main layout; picture-frame recalculates its own fill area
+    // inline in deck-boards.js but we can derive it here too).
+    let trimmed    = false;
+    let trimWidthIn = 0;
+
+    if (lo) {
+        if (s.pattern !== 'picture-frame') {
+            trimmed     = !!lo.lastRowTrimmed;
+            trimWidthIn = lo.lastRowWidthIn || 0;
+        } else {
+            // Picture-frame fill area
+            const { bw: bwFt, ew } = (() => {
+                const bw = CONFIG.boards.width / 12;
+                const g  = CONFIG.boards.gap   / 12;
+                return { bw, ew: bw + g };
+            })();
+            const bc   = s.borderWidth || 1;
+            const bwFtBorder = bc * ew;
+            const iLen = s.deckLength - 2 * bwFtBorder;
+            const iWid = s.deckWidth  - 2 * bwFtBorder;
+            const cov  = s.boardDirection === 'length' ? iWid : iLen;
+            const bwFt = CONFIG.boards.width / 12;
+            const gFt  = CONFIG.boards.gap   / 12;
+            const ewFt = bwFt + gFt;
+            const nRows = Math.ceil(cov / ewFt);
+            const lastNearEdge = (nRows - 1) * ewFt;
+            const lastFarEdge  = lastNearEdge + bwFt;
+            trimmed     = lastFarEdge > cov + 1e-6;
+            trimWidthIn = trimmed ? (cov - lastNearEdge) * 12 : 0;
+        }
+    }
+
+    // Find or create the banner element
+    let banner = document.getElementById('trimNotice');
+    if (!banner) {
+        // Inject adjacent to the canvas / viewport wrapper
+        const viewport = document.getElementById('viewportWrapper')
+                      || document.getElementById('canvasWrapper')
+                      || document.querySelector('.viewport-wrapper')
+                      || document.querySelector('canvas')?.parentElement;
+        if (viewport) {
+            banner = document.createElement('div');
+            banner.id = 'trimNotice';
+            banner.className = 'trim-notice';
+            viewport.insertAdjacentElement('beforebegin', banner);
+        }
+    }
+
+    if (!banner) return; // nowhere safe to inject
+
+    if (trimmed && trimWidthIn > 0.05) {
+        const inchesStr = trimWidthIn.toFixed(3).replace(/\.?0+$/, '');
+        // Express as a fraction for readability
+        const fractionStr = toFractionString(trimWidthIn);
+        banner.innerHTML =
+            `<span class="trim-notice__icon">&#9888;</span>` +
+            `<span class="trim-notice__text">` +
+            `<strong>Board trim required:</strong> ` +
+            `The last board row does not fit the deck width evenly. ` +
+            `1 board per row will need to be ripped down to ` +
+            `<strong>${fractionStr}" (${inchesStr}")</strong> wide to fit your dimensions precisely.` +
+            `</span>`;
+        banner.classList.remove('hidden');
+        banner.style.display = '';
+    } else {
+        banner.classList.add('hidden');
+        banner.style.display = 'none';
+    }
+}
+
+// Convert a decimal inch value to a readable fraction string (to 1/16")
+function toFractionString(decimal) {
+    const whole = Math.floor(decimal);
+    const frac  = decimal - whole;
+    const sixteenths = Math.round(frac * 16);
+    if (sixteenths === 0)  return whole > 0 ? `${whole}` : '0';
+    if (sixteenths === 16) return `${whole + 1}`;
+    const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+    const g   = gcd(sixteenths, 16);
+    const num = sixteenths / g;
+    const den = 16 / g;
+    return whole > 0 ? `${whole} ${num}/${den}` : `${num}/${den}`;
 }
 
 function updateOptimizationCard(s) {
