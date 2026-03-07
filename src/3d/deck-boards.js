@@ -3,7 +3,7 @@
 // ============================================================
 import { CONFIG }                              from '../config.js';
 import { createBoardMaterial, createCapMaterial } from './materials.js';
-import { createBoardGeometry, createTrimmedBoardGeometry, BOARD_PROFILE } from './board-profile.js';
+import { createBoardGeometry, BOARD_PROFILE } from './board-profile.js';
 
 function dims() {
     const bw = CONFIG.boards.width     / 12;
