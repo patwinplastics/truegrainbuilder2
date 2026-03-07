@@ -7,8 +7,8 @@ import { buildDeck } from '../3d/scene.js';
 export function updateUI(s) {
     updateTotalArea(s);
     updatePatternUI(s);
+    updateOptimizationCard(s);
     if (s.results) {
-        updateOptimizationCard(s);
         updateBoardBreakdown(s);
         updateEstimateSummary(s);
         updateReviewSummary(s);

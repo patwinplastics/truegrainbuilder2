@@ -82,6 +82,28 @@
         }
         .landing-step-hint { font-size: 0.78em; color: #888; margin-top: 4px; }
         .landing-step-display { font-size: 0.8em; color: #555; margin-top: 4px; min-height: 1.2em; }
+        /* Optimization card stats */
+        .opt-stat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 4px 0; border-bottom: 1px solid var(--color-border, #eee);
+            font-size: var(--font-size-sm, 13px);
+        }
+        .opt-stat-row:last-of-type { border-bottom: none; }
+        .opt-label { color: var(--color-text-muted, #888); }
+        .opt-value { font-weight: 600; color: var(--color-text, #1a1a1a); }
+        .opt-recommendations {
+            margin: 10px 0 0; padding: 0; list-style: none;
+            font-size: var(--font-size-sm, 13px);
+        }
+        .opt-recommendations li {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 4px 0; border-top: 1px solid var(--color-border, #eee);
+        }
+        .waste-badge {
+            background: var(--color-success-light, #e6f4ec);
+            color: var(--color-success, #1a6e3c);
+            border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -346,7 +368,23 @@
                         <div class="optimization-card">
                             <div class="optimization-card__header">Board Length Optimization</div>
                             <div class="optimization-card__content" id="optimizationContent">
-                                <p style="color:var(--color-text-muted);font-size:var(--font-size-sm)">Calculating...</p>
+                                <div class="opt-stat-row">
+                                    <span class="opt-label">Waste</span>
+                                    <span class="opt-value" id="optWastePercent">--</span>
+                                </div>
+                                <div class="opt-stat-row">
+                                    <span class="opt-label">Total Lineal Ft</span>
+                                    <span class="opt-value" id="optTotalLF">--</span>
+                                </div>
+                                <div class="opt-stat-row">
+                                    <span class="opt-label">Used Lineal Ft</span>
+                                    <span class="opt-value" id="optUsedLF">--</span>
+                                </div>
+                                <div class="opt-stat-row">
+                                    <span class="opt-label">Rows</span>
+                                    <span class="opt-value" id="optNumRows">--</span>
+                                </div>
+                                <ul id="optRecommendations" class="opt-recommendations"></ul>
                             </div>
                         </div>
                         <div id="boardBreakdownContent"></div>
