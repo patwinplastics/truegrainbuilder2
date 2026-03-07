@@ -53,19 +53,19 @@ function updateTrimNotice(s) {
             trimWidthIn = lo.lastRowWidthIn || 0;
         } else {
             // Picture-frame fill area
+            // bwFt is declared once here from the IIFE; reused below for ewFt.
             const { bw: bwFt, ew } = (() => {
                 const bw = CONFIG.boards.width / 12;
                 const g  = CONFIG.boards.gap   / 12;
                 return { bw, ew: bw + g };
             })();
-            const bc   = s.borderWidth || 1;
+            const bc    = s.borderWidth || 1;
             const bwFtBorder = bc * ew;
-            const iLen = s.deckLength - 2 * bwFtBorder;
-            const iWid = s.deckWidth  - 2 * bwFtBorder;
-            const cov  = s.boardDirection === 'length' ? iWid : iLen;
-            const bwFt = CONFIG.boards.width / 12;
-            const gFt  = CONFIG.boards.gap   / 12;
-            const ewFt = bwFt + gFt;
+            const iLen  = s.deckLength - 2 * bwFtBorder;
+            const iWid  = s.deckWidth  - 2 * bwFtBorder;
+            const cov   = s.boardDirection === 'length' ? iWid : iLen;
+            const gFt   = CONFIG.boards.gap / 12;
+            const ewFt  = bwFt + gFt;          // bwFt already defined above
             const nRows = Math.ceil(cov / ewFt);
             const lastNearEdge = (nRows - 1) * ewFt;
             const lastFarEdge  = lastNearEdge + bwFt;
