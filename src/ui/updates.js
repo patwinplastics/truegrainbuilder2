@@ -35,15 +35,13 @@ function updatePatternUI(s) {
 
 // ============================================================
 // Trim notice banner
-// Rendered into #trimNotice if it exists in the HTML, otherwise
-// injected dynamically just above the 3D viewport.
+// Injected as an absolute overlay at the BOTTOM of the
+// scene-container so it never overlaps the view-control
+// buttons at the top of the viewport.
 // ============================================================
 function updateTrimNotice(s) {
     const lo = s.boardLayout;
 
-    // Determine whether ANY trim is needed (straight / breaker use
-    // the main layout; picture-frame recalculates its own fill area
-    // inline in deck-boards.js but we can derive it here too).
     let trimmed    = false;
     let trimWidthIn = 0;
 
@@ -52,8 +50,6 @@ function updateTrimNotice(s) {
             trimmed     = !!lo.lastRowTrimmed;
             trimWidthIn = lo.lastRowWidthIn || 0;
         } else {
-            // Picture-frame fill area
-            // bwFt is declared once here from the IIFE; reused below for ewFt.
             const { bw: bwFt, ew } = (() => {
                 const bw = CONFIG.boards.width / 12;
                 const g  = CONFIG.boards.gap   / 12;
@@ -65,7 +61,7 @@ function updateTrimNotice(s) {
             const iWid  = s.deckWidth  - 2 * bwFtBorder;
             const cov   = s.boardDirection === 'length' ? iWid : iLen;
             const gFt   = CONFIG.boards.gap / 12;
-            const ewFt  = bwFt + gFt;          // bwFt already defined above
+            const ewFt  = bwFt + gFt;
             const nRows = Math.ceil(cov / ewFt);
             const lastNearEdge = (nRows - 1) * ewFt;
             const lastFarEdge  = lastNearEdge + bwFt;
@@ -74,27 +70,28 @@ function updateTrimNotice(s) {
         }
     }
 
-    // Find or create the banner element
+    // Find or create the banner element.
+    // Inject INSIDE .scene-container as a bottom overlay so it
+    // never sits in the same row as the top view-control buttons.
     let banner = document.getElementById('trimNotice');
     if (!banner) {
-        // Inject adjacent to the canvas / viewport wrapper
-        const viewport = document.getElementById('viewportWrapper')
-                      || document.getElementById('canvasWrapper')
-                      || document.querySelector('.viewport-wrapper')
-                      || document.querySelector('canvas')?.parentElement;
-        if (viewport) {
+        const container = document.querySelector('.scene-container')
+                       || document.getElementById('viewportWrapper')
+                       || document.getElementById('canvasWrapper')
+                       || document.querySelector('.viewport-wrapper')
+                       || document.querySelector('canvas')?.parentElement;
+        if (container) {
             banner = document.createElement('div');
             banner.id = 'trimNotice';
             banner.className = 'trim-notice';
-            viewport.insertAdjacentElement('beforebegin', banner);
+            container.appendChild(banner);
         }
     }
 
-    if (!banner) return; // nowhere safe to inject
+    if (!banner) return;
 
     if (trimmed && trimWidthIn > 0.05) {
         const inchesStr = trimWidthIn.toFixed(3).replace(/\.?0+$/, '');
-        // Express as a fraction for readability
         const fractionStr = toFractionString(trimWidthIn);
         banner.innerHTML =
             `<span class="trim-notice__icon">&#9888;</span>` +
@@ -112,7 +109,6 @@ function updateTrimNotice(s) {
     }
 }
 
-// Convert a decimal inch value to a readable fraction string (to 1/16")
 function toFractionString(decimal) {
     const whole = Math.floor(decimal);
     const frac  = decimal - whole;
