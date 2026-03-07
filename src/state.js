@@ -19,7 +19,7 @@ export const state = {
     breakerSameColor: true,
     borderSameColor: true,
     showRailings: false,
-    // Stair state — full data model from stair-data-model-patch
+    // Stair state
     stairs: [],
     stairsEnabled: false,
     selectedStairId: null,
@@ -27,6 +27,8 @@ export const state = {
     wastePercent: CONFIG.waste.default,
     pricePerLF: CONFIG.pricing.materialPerLF.default,
     includeLaborEstimate: false,
+    // Board length selection — user can restrict which lengths are used
+    selectedBoardLengths: [12, 16, 20],
     // Contact
     contactName: '', contactEmail: '', contactPhone: '', contactZip: '',
     // Computed
@@ -39,10 +41,6 @@ let isUpdating = false;
 let _calcLayout = null;
 let _calcAll = null;
 
-/**
- * Inject calculator functions at app init to avoid circular imports.
- * Called once from src/main.js before the app starts.
- */
 export function initCalculators(layoutFn, allFn) {
     _calcLayout = layoutFn;
     _calcAll = allFn;
@@ -62,6 +60,8 @@ export function updateState(updates) {
     try {
         document.getElementById('buildingSpinner')?.classList.remove('hidden');
         Object.assign(state, updates);
+        // Always ensure at least one length is selected
+        if (!state.selectedBoardLengths?.length) state.selectedBoardLengths = [20];
         if (_calcLayout) state.boardLayout = _calcLayout(state);
         if (_calcAll)    state.results     = _calcAll(state);
         listeners.forEach(fn => fn(state));
@@ -77,13 +77,14 @@ export function loadState() {
         if (!saved) return;
         const parsed = JSON.parse(saved);
         if (!parsed.deckLength || !parsed.deckWidth) return;
-        // Backfill stair fields that may be missing from older saves
         if (Array.isArray(parsed.stairs)) {
             parsed.stairs.forEach(s => {
                 if (s.landingDepth === undefined) s.landingDepth = CONFIG.stairs.landingDepth;
                 if (s.landingSplit  === undefined) s.landingSplit  = 0.5;
             });
         }
+        // Backfill selectedBoardLengths for older saves
+        if (!parsed.selectedBoardLengths) parsed.selectedBoardLengths = [12, 16, 20];
         Object.assign(state, parsed);
     } catch (_) {
         localStorage.removeItem('truegrain-deck-state');

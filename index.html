@@ -104,6 +104,32 @@
             color: var(--color-success, #1a6e3c);
             border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600;
         }
+        /* Board length selector */
+        .board-length-selector {
+            display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;
+        }
+        .board-length-selector label {
+            display: flex; align-items: center; gap: 5px;
+            font-size: 13px; font-weight: 500; cursor: pointer;
+            background: var(--color-bg-alt, #f5f5f5);
+            border: 1.5px solid var(--color-border, #ddd);
+            border-radius: 8px; padding: 5px 12px;
+            transition: border-color 0.15s, background 0.15s;
+            user-select: none;
+        }
+        .board-length-selector input[type=checkbox] { accent-color: #1a6e3c; }
+        .board-length-selector label:has(input:checked) {
+            border-color: #1a6e3c;
+            background: #e6f4ec;
+            color: #1a6e3c;
+        }
+        /* Stair breakdown sub-section */
+        .opt-section-header {
+            font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+            text-transform: uppercase; color: var(--color-text-muted, #888);
+            margin: 12px 0 4px; padding-top: 10px;
+            border-top: 1px solid var(--color-border, #eee);
+        }
     </style>
 </head>
 <body>
@@ -295,8 +321,6 @@
                                         <label class="radio-card radio-card--small"><input type="radio" name="stairShape" value="l-shape"><span>L-Shape</span></label>
                                     </div>
                                 </div>
-
-                                <!-- L-Shape options -->
                                 <div class="l-shape-options hidden" id="lShapeOptions">
                                     <div class="form-group">
                                         <label class="form-label">Turn Direction</label>
@@ -305,8 +329,6 @@
                                             <label class="radio-card radio-card--small selected"><input type="radio" name="stairTurnDirection" value="right" checked><span>Turn Right</span></label>
                                         </div>
                                     </div>
-
-                                    <!-- Landing Position: step number input -->
                                     <div class="form-group landing-step-group">
                                         <label class="form-label" for="landingStepInput">Landing after riser #</label>
                                         <div class="landing-step-row">
@@ -316,7 +338,6 @@
                                         <div class="landing-step-display" id="landingStepDisplay"></div>
                                         <p class="form-hint">Enter which riser the landing falls after. Leave blank for automatic midpoint.</p>
                                     </div>
-
                                     <div class="stair-info-card" id="lShapeInfoCard">
                                         <div class="stair-info-header">L-SHAPE DIMENSIONS</div>
                                         <div class="stair-info-row"><span class="stair-info-label">Lower Flight Steps:</span><span class="stair-info-value" id="lShapeLowerSteps">2</span></div>
@@ -326,7 +347,6 @@
                                         <div class="stair-info-row"><span class="stair-info-label">Upper Run:</span><span class="stair-info-value" id="lShapeUpperRun">1.75 ft</span></div>
                                     </div>
                                 </div>
-
                                 <div class="form-group">
                                     <div class="checkbox-toggle"><input type="checkbox" id="stairHandrails" checked><label for="stairHandrails">Include handrails on stairs</label></div>
                                 </div>
@@ -368,6 +388,18 @@
                         <div class="optimization-card">
                             <div class="optimization-card__header">Board Length Optimization</div>
                             <div class="optimization-card__content" id="optimizationContent">
+
+                                <!-- Board length selector -->
+                                <div style="margin-bottom:10px">
+                                    <div class="opt-label" style="margin-bottom:4px;font-size:12px">Available lengths</div>
+                                    <div class="board-length-selector">
+                                        <label><input type="checkbox" id="boardLength12" checked> 12 ft</label>
+                                        <label><input type="checkbox" id="boardLength16" checked> 16 ft</label>
+                                        <label><input type="checkbox" id="boardLength20" checked> 20 ft</label>
+                                    </div>
+                                </div>
+
+                                <!-- Deck board optimization stats -->
                                 <div class="opt-stat-row">
                                     <span class="opt-label">Waste</span>
                                     <span class="opt-value" id="optWastePercent">--</span>
@@ -385,6 +417,32 @@
                                     <span class="opt-value" id="optNumRows">--</span>
                                 </div>
                                 <ul id="optRecommendations" class="opt-recommendations"></ul>
+
+                                <!-- Stair breakdown — hidden until stairs are enabled -->
+                                <div id="optStairBreakdown" class="hidden">
+                                    <div class="opt-section-header">Stair Materials (<span id="optStairCount">0</span> stair set)</div>
+                                    <div class="opt-stat-row">
+                                        <span class="opt-label">Tread Boards</span>
+                                        <span class="opt-value" id="optTreadBoards">--</span>
+                                    </div>
+                                    <div class="opt-stat-row">
+                                        <span class="opt-label">Riser Boards</span>
+                                        <span class="opt-value" id="optRiserBoards">--</span>
+                                    </div>
+                                    <div class="opt-stat-row" id="optLandingBoardsRow">
+                                        <span class="opt-label">Landing Boards</span>
+                                        <span class="opt-value" id="optLandingBoards">--</span>
+                                    </div>
+                                    <div class="opt-stat-row">
+                                        <span class="opt-label">Stringers</span>
+                                        <span class="opt-value" id="optStringers">--</span>
+                                    </div>
+                                    <div class="opt-stat-row">
+                                        <span class="opt-label">Stair Total LF</span>
+                                        <span class="opt-value" id="optStairTotalLF">--</span>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                         <div id="boardBreakdownContent"></div>

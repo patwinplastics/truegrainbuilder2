@@ -35,9 +35,6 @@ function updatePatternUI(s) {
 
 // ============================================================
 // Trim notice banner
-// Injected as an absolute overlay at the BOTTOM of the
-// scene-container so it never overlaps the view-control
-// buttons at the top of the viewport.
 // ============================================================
 function updateTrimNotice(s) {
     const lo = s.boardLayout;
@@ -70,9 +67,6 @@ function updateTrimNotice(s) {
         }
     }
 
-    // Find or create the banner element.
-    // Inject INSIDE .scene-container as a bottom overlay so it
-    // never sits in the same row as the top view-control buttons.
     let banner = document.getElementById('trimNotice');
     if (!banner) {
         const container = document.querySelector('.scene-container')
@@ -135,6 +129,40 @@ function updateOptimizationCard(s) {
             .map(r => `<li>${r.description} <span class="waste-badge">${r.wastePercent.toFixed(1)}% waste</span></li>`)
             .join('');
     }
+
+    // Sync length checkboxes to current state (handles load from localStorage)
+    CONFIG.boards.availableLengths.forEach(len => {
+        const cb = document.getElementById(`boardLength${len}`);
+        if (cb) cb.checked = s.selectedBoardLengths?.includes(len) ?? true;
+    });
+
+    // Stair breakdown
+    const stairSection = document.getElementById('optStairBreakdown');
+    if (!stairSection) return;
+
+    const stairs = s.results?.stairs;
+    if (!s.stairsEnabled || !stairs?.enabled) {
+        stairSection.classList.add('hidden');
+        return;
+    }
+    stairSection.classList.remove('hidden');
+
+    setText('optStairCount',    stairs.stairCount);
+    setText('optTreadBoards',   stairs.treadBoards.total + ' boards (' + stairs.treadBoards.linealFeet.toFixed(0) + ' LF)');
+    setText('optRiserBoards',   stairs.riserBoards.total + ' boards (' + stairs.riserBoards.linealFeet.toFixed(0) + ' LF)');
+    setText('optStringers',     stairs.stringers.count + ' @ ' + stairs.stringers.lengthEach.toFixed(1) + ' ft each (' + stairs.stringers.totalLinealFeet.toFixed(0) + ' LF)');
+
+    const landingEl = document.getElementById('optLandingBoardsRow');
+    if (landingEl) {
+        if (stairs.landingBoards.total > 0) {
+            landingEl.classList.remove('hidden');
+            setText('optLandingBoards', stairs.landingBoards.total + ' boards (' + stairs.landingBoards.linealFeet.toFixed(0) + ' LF)');
+        } else {
+            landingEl.classList.add('hidden');
+        }
+    }
+
+    setText('optStairTotalLF',  stairs.totalCompositeLF.toFixed(0));
 }
 
 function updateBoardBreakdown(s) {

@@ -28,7 +28,7 @@ export function determinePattern(state) {
     const runDim = state.boardDirection === 'length' ? state.deckLength : state.deckWidth;
     let breakerPosition = null;
     if (state.pattern === 'breaker' || state.pattern === 'picture-frame') {
-        breakerPosition = optimizeBreakPosition(runDim);
+        breakerPosition = optimizeBreakPosition(runDim, state);
     }
     return {
         type:               state.pattern,
@@ -39,12 +39,13 @@ export function determinePattern(state) {
     };
 }
 
-function optimizeBreakPosition(totalLength) {
+function optimizeBreakPosition(totalLength, state) {
+    const lengths = getAllowedLengths(state);
     let best = { waste: Infinity, position: totalLength / 2 };
-    for (const len1 of CONFIG.boards.availableLengths) {
+    for (const len1 of lengths) {
         const remaining = totalLength - len1 - CONFIG.boards.width / 12;
         if (remaining > 0 && remaining <= 20) {
-            const len2  = selectOptimalBoardLength(remaining);
+            const len2  = selectOptimalBoardLength(remaining, lengths);
             const waste = Math.abs(len1 - totalLength / 2) + (len2 - remaining);
             if (waste < best.waste) best = { waste, position: len1 };
         }
@@ -52,10 +53,20 @@ function optimizeBreakPosition(totalLength) {
     return best.waste < 2 ? best.position : totalLength / 2;
 }
 
+function getAllowedLengths(state) {
+    const sel = state.selectedBoardLengths;
+    if (sel?.length) {
+        const filtered = CONFIG.boards.availableLengths.filter(l => sel.includes(l));
+        if (filtered.length) return filtered;
+    }
+    return CONFIG.boards.availableLengths;
+}
+
 function calculateBoards(state, pattern) {
     const layout = state.boardLayout;
     if (!layout) return { byLength: { 12: 0, 16: 0, 20: 0 }, total: 0, linealFeet: 0 };
 
+    const lengths  = getAllowedLengths(state);
     const byLen    = { ...layout.boardsByLength };
     const border   = { 12: 0, 16: 0, 20: 0 };
 
@@ -63,11 +74,11 @@ function calculateBoards(state, pattern) {
         const bwFt    = pattern.borderWidth * (CONFIG.boards.width / 12);
         const runDim  = state.boardDirection === 'length' ? state.deckLength : state.deckWidth;
         const covDim  = state.boardDirection === 'length' ? state.deckWidth  : state.deckLength;
-        border[selectOptimalBoardLength(runDim)] += pattern.borderWidth * 2;
-        border[selectOptimalBoardLength(covDim - 2 * bwFt)] += pattern.borderWidth * 2;
+        border[selectOptimalBoardLength(runDim, lengths)] += pattern.borderWidth * 2;
+        border[selectOptimalBoardLength(covDim - 2 * bwFt, lengths)] += pattern.borderWidth * 2;
     } else if (pattern.type === 'breaker') {
         const covDim = state.boardDirection === 'length' ? state.deckWidth : state.deckLength;
-        byLen[selectOptimalBoardLength(covDim)] = (byLen[selectOptimalBoardLength(covDim)] || 0) + 1;
+        byLen[selectOptimalBoardLength(covDim, lengths)] = (byLen[selectOptimalBoardLength(covDim, lengths)] || 0) + 1;
     }
 
     let total = 0, lf = 0;
@@ -92,7 +103,7 @@ function calculateHardware(state) {
 }
 
 // ============================================================
-// Stair dimension calculation (inlined to avoid circular deps)
+// Stair dimension calculation
 // ============================================================
 function calcStairDims(sc, st) {
     const hi = st.deckHeight * 12;
@@ -152,8 +163,9 @@ function calculateStairs(state) {
 
     if (!state.stairsEnabled || !state.stairs?.length) return result;
     result.enabled = true;
-    const bwFt = CONFIG.boards.width / 12;
+    const bwFt  = CONFIG.boards.width / 12;
     const gapFt = CONFIG.boards.gap / 12;
+    const lengths = getAllowedLengths(state);
 
     state.stairs.forEach(stair => {
         if (!stair.enabled) return;
@@ -163,7 +175,7 @@ function calculateStairs(state) {
         if (!dims?.isValid) return;
 
         const sw = dims.stairWidthFeet;
-        const treadBoardLen = selectOptimalBoardLength(sw);
+        const treadBoardLen = selectOptimalBoardLength(sw, lengths);
 
         const treadCount = dims.numTreads * dims.boardsPerTread;
         result.treadBoards.byLength[treadBoardLen] = (result.treadBoards.byLength[treadBoardLen] || 0) + treadCount;
@@ -186,7 +198,7 @@ function calculateStairs(state) {
             const landingWidth = sw + ld.run2Feet;
             const landingDepth = Math.max(ld.landingDepthFeet, sw);
             const landingRows = Math.ceil(landingDepth / (bwFt + gapFt));
-            const landingBoardLen = selectOptimalBoardLength(landingWidth);
+            const landingBoardLen = selectOptimalBoardLength(landingWidth, lengths);
             result.landingBoards.byLength[landingBoardLen] = (result.landingBoards.byLength[landingBoardLen] || 0) + landingRows;
             result.landingBoards.total += landingRows;
             result.landingBoards.linealFeet += landingRows * landingBoardLen;
@@ -226,8 +238,8 @@ function applyWaste(state, boards, hw, stairs) {
             });
             return wasted;
         };
-        stairWithWaste.treadBoards = applyWasteToGroup(stairs.treadBoards);
-        stairWithWaste.riserBoards = applyWasteToGroup(stairs.riserBoards);
+        stairWithWaste.treadBoards  = applyWasteToGroup(stairs.treadBoards);
+        stairWithWaste.riserBoards  = applyWasteToGroup(stairs.riserBoards);
         stairWithWaste.landingBoards = applyWasteToGroup(stairs.landingBoards);
         stairWithWaste.totalCompositeBoards = stairWithWaste.treadBoards.total + stairWithWaste.riserBoards.total + stairWithWaste.landingBoards.total;
         stairWithWaste.totalCompositeLF = stairWithWaste.treadBoards.linealFeet + stairWithWaste.riserBoards.linealFeet + stairWithWaste.landingBoards.linealFeet;

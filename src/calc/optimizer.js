@@ -12,20 +12,22 @@ export function calculateOptimalBoardLayout(state) {
     const effectiveWidth = boardWidthFt + gapFt;
     const numRows        = Math.ceil(coverDim / effectiveWidth);
 
-    // ---- Trim detection ----
-    // The leading edge of the last row sits at: (numRows - 1) * effectiveWidth
-    // Its far edge without trimming would be at: (numRows - 1) * effectiveWidth + boardWidthFt
-    // If that overshoots coverDim the board must be ripped down.
     const lastRowLeadingEdge = (numRows - 1) * effectiveWidth;
     const fullLastRowFarEdge = lastRowLeadingEdge + boardWidthFt;
     const lastRowTrimmed     = fullLastRowFarEdge > coverDim + 1e-6;
     const lastRowWidthFt     = lastRowTrimmed ? (coverDim - lastRowLeadingEdge) : boardWidthFt;
 
-    const combinations = findBoardCombinations(runDim);
+    // Use only the lengths the user has selected, falling back to all lengths
+    const allowedLengths = (state.selectedBoardLengths?.length)
+        ? [...CONFIG.boards.availableLengths].filter(l => state.selectedBoardLengths.includes(l))
+        : CONFIG.boards.availableLengths;
+    const effectiveLengths = allowedLengths.length ? allowedLengths : CONFIG.boards.availableLengths;
+
+    const combinations = findBoardCombinations(runDim, effectiveLengths);
     combinations.sort((a, b) => a.wastePercent - b.wastePercent);
 
     const best = combinations[0] || {
-        segments:     [{ length: selectOptimalBoardLength(runDim), actualLength: runDim }],
+        segments:     [{ length: selectOptimalBoardLength(runDim, effectiveLengths), actualLength: runDim }],
         wastePercent: 0
     };
 
@@ -42,17 +44,15 @@ export function calculateOptimalBoardLayout(state) {
         totalLinealFeet: Object.entries(boardsByLength).reduce((s, [l, c]) => s + c * +l, 0),
         usedLinealFeet:  numRows * runDim,
         recommendations: combinations.slice(0, 3),
-        // Trim metadata
         lastRowTrimmed,
         lastRowWidthFt,
         lastRowWidthIn:  lastRowWidthFt * 12
     };
 }
 
-function findBoardCombinations(target) {
-    const LENGTHS = CONFIG.boards.availableLengths;
-    const gap     = CONFIG.boards.gap / 12;
-    const combos  = [];
+function findBoardCombinations(target, LENGTHS) {
+    const gap    = CONFIG.boards.gap / 12;
+    const combos = [];
 
     // Single board
     for (const len of LENGTHS) {
@@ -91,7 +91,7 @@ function findBoardCombinations(target) {
     }
 
     // Perfect fits
-    findPerfectFits(target, gap).forEach(fit => {
+    findPerfectFits(target, gap, LENGTHS).forEach(fit => {
         if (!combos.find(c => c.description === fit.description)) combos.push(fit);
     });
 
@@ -119,8 +119,9 @@ function findBoardCombinations(target) {
     return combos;
 }
 
-function findPerfectFits(target, gap) {
+function findPerfectFits(target, gap, LENGTHS) {
     return [[12,12,24],[16,16,32],[20,20,40],[12,16,28],[16,20,36]]
+        .filter(([l1, l2]) => LENGTHS.includes(l1) && LENGTHS.includes(l2))
         .filter(([,, t]) => Math.abs(target - t) < 0.5)
         .map(([l1, l2]) => ({
             segments:     [{ length: l1, actualLength: l1 - gap/2, start: 0 }, { length: l2, actualLength: l2 - gap/2, start: l1 }],
@@ -131,7 +132,8 @@ function findPerfectFits(target, gap) {
         }));
 }
 
-export function selectOptimalBoardLength(required) {
-    for (const len of CONFIG.boards.availableLengths) if (len >= required) return len;
-    return CONFIG.boards.availableLengths.at(-1);
+export function selectOptimalBoardLength(required, lengths) {
+    const LENGTHS = lengths || CONFIG.boards.availableLengths;
+    for (const len of LENGTHS) if (len >= required) return len;
+    return LENGTHS.at(-1);
 }

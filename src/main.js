@@ -56,7 +56,6 @@ function syncSlider(sliderId, inputId, key, min, max, parse = parseFloat) {
     });
 }
 
-// Syncs .selected class on .radio-card labels to match the checked radio input
 function syncRadioCards(name) {
     document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
         r.closest('.radio-card')?.classList.toggle('selected', r.checked);
@@ -129,6 +128,25 @@ function bindEventListeners() {
     wire('stairsEnabled', v => {
         updateState({ stairsEnabled: v });
         document.getElementById('stairEdgeSection')?.classList.toggle('hidden', !v);
+    });
+
+    // ---- Board length selection checkboxes ----
+    CONFIG.boards.availableLengths.forEach(len => {
+        const el = document.getElementById(`boardLength${len}`);
+        if (!el) return;
+        el.checked = state.selectedBoardLengths.includes(len);
+        el.addEventListener('change', () => {
+            const checked = CONFIG.boards.availableLengths.filter(l => {
+                const cb = document.getElementById(`boardLength${l}`);
+                return cb?.checked;
+            });
+            // Prevent deselecting all — require at least one
+            if (checked.length === 0) {
+                el.checked = true;
+                return;
+            }
+            updateState({ selectedBoardLengths: checked });
+        });
     });
 
     // ---- Contact fields ----
