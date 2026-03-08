@@ -784,13 +784,18 @@ body {
     color: var(--color-text-muted);
 }
 
-/* Review Summary */
+/* ============================================== */
+/* Review Summary (Step 7)                        */
+/* ============================================== */
+
 .review-summary {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
 }
 
+/* Two-card layout: Dimensions + Materials */
 .review-card {
     background: var(--color-surface-alt);
     border: 1px solid var(--color-border-light);
@@ -799,42 +804,109 @@ body {
 }
 
 .review-card__title {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
     color: var(--color-text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: var(--spacing-sm);
+    letter-spacing: 0.6px;
+    margin-bottom: var(--spacing-md);
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
 }
 
 .review-card__title svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
+    color: var(--color-primary);
 }
 
+/* Grid of label/value pairs inside a card */
 .review-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-sm) var(--spacing-md);
 }
 
 .review-item {
     display: flex;
     flex-direction: column;
+    gap: 2px;
+}
+
+.review-item--full {
+    grid-column: 1 / -1;
 }
 
 .review-item__label {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
 }
 
 .review-item__value {
     font-size: var(--font-size-base);
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-text);
+}
+
+/* Total cost highlight row */
+.review-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: var(--color-primary);
+    border-radius: var(--radius-md);
+    color: white;
+}
+
+.review-total__label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    opacity: 0.85;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.review-total__value {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+}
+
+/* Legacy .review-row fallback (kept for JS compatibility) */
+.review-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid var(--color-border-light);
+    gap: var(--spacing-md);
+}
+
+.review-row:last-child {
+    border-bottom: none;
+}
+
+.review-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    font-weight: 500;
+    flex-shrink: 0;
+    min-width: 90px;
+}
+
+.review-row--total .review-label {
+    font-weight: 700;
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+}
+
+.review-row--total span:last-child {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--color-primary);
 }
 
 /* Contact Form */
@@ -845,6 +917,13 @@ body {
     padding: var(--spacing-lg);
     margin-top: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
+}
+
+.contact-form h3 {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    margin-bottom: var(--spacing-lg);
+    color: var(--color-text);
 }
 
 .contact-form__title {
