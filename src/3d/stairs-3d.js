@@ -1,8 +1,7 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Stair 3D Geometry
-// v4.7 — all stringers use correct notched ExtrudeGeometry
-//         initial plumb cut first, then seat/plumb per tread
-//         risePerStepFt passed explicitly (actualRise/12)
+// v4.8 — stringer bottom closes correctly at last plumb cut foot
+//         no longer draws diagonal back to origin (no filled wedge)
 // ============================================================
 import { CONFIG }              from '../config.js';
 import { state }               from '../state.js';
@@ -85,7 +84,6 @@ const handrailMat = () => {
 
 // ============================================================
 // Stringer position table
-// All stringers use the same notched profile.
 // ============================================================
 function getStringerPositions(stairWidthFt) {
     const sideL = -stairWidthFt / 2 + ST.in;
@@ -144,31 +142,26 @@ function buildRailingSegment(parent, mat, x1, z1, x2, z2, surfY) {
 }
 
 // ============================================================
-// Notched stringer (all stringers — side and center alike)
+// Notched stringer
 //
 // 2D shape coordinate system:
 //   u (local X) = run direction, positive away from deck
 //   v (local Y) = height, positive up / negative down
-//   origin (0,0) = top of stringer at deck edge = startY in world
+//   origin (0,0) = top of stringer at deck edge
 //
-// Correct notch sequence:
-//   1. Initial plumb cut: drop straight down one full rise at x=0
-//      (this is the back face against the rim joist / ledger)
-//   2. For each tread i = 0..numTreads-1:
-//      a. Seat cut  (horizontal): move forward one tread depth at
-//         the current level — this is where the tread board sits
-//      b. Plumb cut (vertical):   drop one full rise
-//   3. Close shape: bottom edge back to x=0, then straight up
-//
-// Total drop = (numTreads + 1) * risePerStepFt = deckHeight
-// because numRisers = numTreads + 1
-//
-// Rotation (mesh.rotation.y) to align shape-X to run direction
-// and extrude local-Z to lateral/width axis:
-//   dirZ=-1 (front): +PI/2
-//   dirZ=+1 (back):  -PI/2
-//   dirX=+1 (right): 0
-//   dirX=-1 (left):  PI
+// Shape sequence:
+//   1. Start at top-back corner (0, 0)
+//   2. Initial plumb cut: down one rise to (0, -rise)
+//   3. For each tread i = 0..numTreads-1:
+//      a. Seat cut (horizontal): forward one tread depth
+//      b. Plumb cut (vertical):  down one rise
+//   4. After last plumb cut we are at (totalRunFt, -totalRiseFt)
+//      i.e. the bottom-front corner — the foot of the stringer.
+//      Close the shape by drawing straight back along the board
+//      bottom to the back edge, then straight up to the origin.
+//      The board bottom is at v = -totalRiseFt (ground level at
+//      the foot) — NOT a diagonal back to x=0.
+//      This produces a proper notched board shape with no wedge fill.
 // ============================================================
 function buildNotchedStringer(
     parent, mat,
@@ -178,42 +171,40 @@ function buildNotchedStringer(
     dirX, dirZ
 ) {
     const totalRiseFt = (numTreads + 1) * risePerStepFt;
+    const totalRunFt  = numTreads * treadDepthFt;
     const runsX = Math.abs(dirX) > 0.5;
 
     // ---- 2D profile ----------------------------------------
     const shape = new THREE.Shape();
-    shape.moveTo(0, 0);                              // top corner, deck surface
-    shape.lineTo(0, -risePerStepFt);                 // initial plumb cut (one rise down)
+    shape.moveTo(0, 0);                              // top-back corner
+    shape.lineTo(0, -risePerStepFt);                 // initial plumb cut
 
     for (let i = 0; i < numTreads; i++) {
         const u = (i + 1) * treadDepthFt;
-        const v = -(i + 1) * risePerStepFt;         // tread bottom level
+        const v = -(i + 1) * risePerStepFt;
         shape.lineTo(u, v);                          // seat cut (horizontal)
         shape.lineTo(u, v - risePerStepFt);          // plumb cut (vertical)
     }
 
-    // At this point we are at (numTreads*treadDepth, -totalRiseFt)
-    shape.lineTo(0, -totalRiseFt);                   // bottom edge back to x=0
-    shape.lineTo(0, 0);                              // close up back face
+    // Now at (totalRunFt, -totalRiseFt) — foot of stringer.
+    // Close correctly: horizontal back along bottom, then vertical up.
+    // This gives a proper board profile — NOT a diagonal wedge.
+    shape.lineTo(0, -totalRiseFt);                   // bottom edge (horizontal back)
+    shape.lineTo(0, 0);                              // back face up to origin
 
-    // ---- Extrude (local Z becomes lateral) -----------------
+    // ---- Extrude (local Z becomes lateral thickness) -------
     const geom = new THREE.ExtrudeGeometry(shape, { depth: ST.th, bevelEnabled: false });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.castShadow = true;
 
-    // ---- Rotate so shape-X = run direction, Z = lateral ----
+    // ---- Rotate so shape-X = run direction -----------------
     if (runsX) {
         if (dirX < 0) mesh.rotation.y = Math.PI;
-        // dirX=+1: no rotation needed
     } else {
         mesh.rotation.y = (dirZ < 0) ? Math.PI / 2 : -Math.PI / 2;
     }
 
     // ---- World position ------------------------------------
-    // Shape origin (0,0) = deck surface at deck edge = startY.
-    // Extrude fills local Z from 0 to ST.th.
-    // After rotation, local Z = lateral world axis.
-    // Center on lat: offset by -ST.th/2.
     if (runsX) {
         mesh.position.set(
             originX,
@@ -232,8 +223,7 @@ function buildNotchedStringer(
 }
 
 // ============================================================
-// buildFlightStringers — all positions use notched profile
-// risePerStepFt MUST be passed explicitly as dims.actualRise/12
+// buildFlightStringers
 // ============================================================
 function buildFlightStringers(p) {
     const mat = stringerMat();
