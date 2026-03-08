@@ -12,16 +12,21 @@ import { formatCurrency } from '../ui/updates.js';
 const NAVY  = [27,  42, 107];   // #1B2A6B
 const RED   = [200, 16,  46];   // #C8102E
 const WHITE = [255, 255, 255];
-const LGRAY = [245, 246, 248];  // light row fill
-const DGRAY = [80,  80,  80];   // body text
-const RULE  = [210, 213, 222];  // subtle divider
+const LGRAY = [245, 246, 248];
+const DGRAY = [80,  80,  80];
+const RULE  = [210, 213, 222];
 
-// Logo placement constants — easy to tune in one place
-const LOGO_X      = 14;    // mm from left edge
-const LOGO_Y      = 5.5;   // mm from top of header
-const LOGO_W      = 68;    // logo image width
-const LOGO_H      = 22;    // logo image height
-const LOGO_PAD    = 3;     // white padding around logo
+// ── Logo placement ───────────────────────────────────────
+const LOGO_X   = 14;
+const LOGO_Y   = 5.5;
+const LOGO_W   = 68;
+const LOGO_H   = 22;
+const LOGO_PAD = 3;
+
+// ── Layout constants ──────────────────────────────────────
+const FOOTER_H    = 22;     // total footer band height (mm)
+const SNAP_MAX_H  = 52;     // max 3D snapshot height (mm) — prevents bloat
+const SNAP_MAX_W_FRAC = 1;  // snapshot uses full content width
 
 export function generatePDF() {
     if (!window.jspdf?.jsPDF) { alert('PDF library not loaded. Please refresh the page.'); return; }
@@ -29,54 +34,35 @@ export function generatePDF() {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pw  = doc.internal.pageSize.getWidth();   // 210
     const ph  = doc.internal.pageSize.getHeight();  // 297
-    const M   = 14;   // page margin
-    let y     = 0;
+    const M   = 14;
+    // Body must stop before the footer band + a comfortable margin
+    const BODY_MAX_Y = ph - FOOTER_H - 6;
+    let y = 0;
 
     // ── 1. HEADER BAND ──────────────────────────────────────
-
-    // Navy background
     doc.setFillColor(...NAVY);
     doc.rect(0, 0, pw, 36, 'F');
-
-    // Red accent stripe at very top
     doc.setFillColor(...RED);
     doc.rect(0, 0, pw, 3, 'F');
 
-    // ─ White backing card for logo — drawn BEFORE the image so it sits behind it
+    // White backing card so navy-bordered logo is legible on navy header
     doc.setFillColor(...WHITE);
-    doc.roundedRect(
-        LOGO_X - LOGO_PAD,
-        LOGO_Y - LOGO_PAD,
-        LOGO_W + LOGO_PAD * 2,
-        LOGO_H + LOGO_PAD * 2,
-        2, 2, 'F'
-    );
+    doc.roundedRect(LOGO_X - LOGO_PAD, LOGO_Y - LOGO_PAD, LOGO_W + LOGO_PAD * 2, LOGO_H + LOGO_PAD * 2, 2, 2, 'F');
 
-    // Logo image on top of white card
     try {
         doc.addImage(CONFIG.logoPath, 'PNG', LOGO_X, LOGO_Y, LOGO_W, LOGO_H);
     } catch (_) {
-        // Fallback: render brand name in navy text on the white card
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.setTextColor(...NAVY);
+        doc.setFont('helvetica', 'bold');   doc.setFontSize(14); doc.setTextColor(...NAVY);
         doc.text('TrueGrain', LOGO_X + 2, LOGO_Y + 10);
         doc.setTextColor(...RED);
         doc.text('Decking', LOGO_X + 36, LOGO_Y + 10);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(...DGRAY);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...DGRAY);
         doc.text('FEELS REAL. LASTS LONGER.  by American PRO', LOGO_X + 2, LOGO_Y + 17);
     }
 
-    // Document title (right side of header)
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');   doc.setFontSize(10); doc.setTextColor(...WHITE);
     doc.text('DECK MATERIAL ESTIMATE', pw - M, 17, { align: 'right' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(180, 190, 220);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);  doc.setTextColor(180, 190, 220);
     doc.text(
         `Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
         pw - M, 23, { align: 'right' }
@@ -85,16 +71,19 @@ export function generatePDF() {
     y = 44;
 
     // ── 2. 3D SNAPSHOT ──────────────────────────────────────
+    // Derive height from the canvas's real pixel aspect ratio — no stretching
     try {
         const rnd = getRenderer(), cam = getCamera(), scn = getScene();
         if (rnd && cam && scn) {
             rnd.render(scn, cam);
-            const imgW = pw - 2 * M;
-            const imgH = 56;
+            const canvas  = rnd.domElement;
+            const aspect  = canvas.width / canvas.height;          // e.g. 16/9
+            const imgW    = (pw - 2 * M) * SNAP_MAX_W_FRAC;
+            const imgH    = Math.min(imgW / aspect, SNAP_MAX_H);   // respects ratio, caps height
             doc.setDrawColor(...NAVY);
             doc.setLineWidth(0.4);
             doc.roundedRect(M, y, imgW, imgH, 2, 2, 'S');
-            doc.addImage(rnd.domElement.toDataURL('image/jpeg', 0.88), 'JPEG', M, y, imgW, imgH, '', 'FAST');
+            doc.addImage(canvas.toDataURL('image/jpeg', 0.88), 'JPEG', M, y, imgW, imgH, '', 'FAST');
             y += imgH + 8;
         }
     } catch (_) {}
@@ -107,7 +96,6 @@ export function generatePDF() {
     let   yL   = y;
     let   yR   = y;
 
-    // LEFT: Deck Configuration
     yL = drawSectionHeader(doc, 'Deck Configuration', M, yL, colW);
     yL = drawTable(doc, [
         ['Size',     `${state.deckLength}' x ${state.deckWidth}' (${(state.deckLength * state.deckWidth).toFixed(0)} sq ft)`],
@@ -118,7 +106,6 @@ export function generatePDF() {
         ['Stairs',   state.stairsEnabled ? `${state.stairs.length} set(s)` : 'None']
     ], M, yL, colW);
 
-    // RIGHT: Material Summary
     yR = drawSectionHeader(doc, 'Material Summary', colR, yR, colW);
     if (r?.boards) {
         yR = drawTable(doc, [
@@ -133,7 +120,7 @@ export function generatePDF() {
 
     y = Math.max(yL, yR) + 8;
 
-    // ── 4. COST ESTIMATE — FULL WIDTH ───────────────────────
+    // ── 4. COST ESTIMATE ──────────────────────────────────────
     if (r?.costs) {
         const c = r.costs;
         y = drawSectionHeader(doc, 'Cost Estimate', M, y, pw - 2 * M);
@@ -143,13 +130,10 @@ export function generatePDF() {
             ['Hardware',         formatCurrency(c.hardware.total)]
         ], M, y, pw - 2 * M);
 
-        // Grand total — navy highlight row
         const rowH = 10;
         doc.setFillColor(...NAVY);
         doc.roundedRect(M, y, pw - 2 * M, rowH, 2, 2, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...WHITE);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...WHITE);
         doc.text('Estimated Total Range', M + 4, y + 6.5);
         doc.text(
             `${formatCurrency(c.grandTotal.materialsOnly.low)} – ${formatCurrency(c.grandTotal.materialsOnly.high)}`,
@@ -180,29 +164,25 @@ export function generatePDF() {
     }
 
     // ── 6. DISCLAIMER ────────────────────────────────────────
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.5);
-    doc.setTextColor(150, 150, 160);
-    doc.text(
-        doc.splitTextToSize(
-            'This estimate is for material quantities only and does not include labor, permits, or installation costs. Prices subject to change without notice. Contact us for a full project quote.',
-            pw - 2 * M
-        ),
-        M, y
-    );
+    // Clamp y so disclaimer never runs into the footer band
+    const disclaimerText = 'This estimate is for material quantities only and does not include labor, permits, or installation costs. Prices subject to change without notice. Contact us for a full project quote.';
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(150, 150, 160);
+    const dLines    = doc.splitTextToSize(disclaimerText, pw - 2 * M);
+    const dHeight   = dLines.length * 4;                          // ~4mm per line at 7.5pt
+    const disclaimerY = Math.min(y, BODY_MAX_Y - dHeight);        // push up if too low
+    doc.text(dLines, M, disclaimerY);
 
     // ── 7. FOOTER BAND ───────────────────────────────────────
+    // Red rule
     doc.setFillColor(...RED);
-    doc.rect(0, ph - 22, pw, 1.5, 'F');
+    doc.rect(0, ph - FOOTER_H, pw, 1.5, 'F');
+    // Navy band
     doc.setFillColor(...NAVY);
-    doc.rect(0, ph - 20.5, pw, 20.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...WHITE);
+    doc.rect(0, ph - FOOTER_H + 1.5, pw, FOOTER_H - 1.5, 'F');
+
+    doc.setFont('helvetica', 'bold');   doc.setFontSize(8.5); doc.setTextColor(...WHITE);
     doc.text(CONFIG.companyInfo.phone, pw / 2, ph - 13, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(180, 190, 220);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(180, 190, 220);
     doc.text(`${CONFIG.companyInfo.email}  |  ${CONFIG.companyInfo.address}`, pw / 2, ph - 8,   { align: 'center' });
     doc.text('Feels Real. Lasts Longer.  by American PRO',                    pw / 2, ph - 3.5, { align: 'center' });
 
@@ -214,12 +194,9 @@ export function generatePDF() {
 function drawSectionHeader(doc, title, x, y, w) {
     doc.setFillColor(...NAVY);
     doc.rect(x, y, 3, 6.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(...NAVY);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...NAVY);
     doc.text(title.toUpperCase(), x + 6, y + 5.5);
-    doc.setDrawColor(...RULE);
-    doc.setLineWidth(0.3);
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.3);
     doc.line(x, y + 8, x + w, y + 8);
     return y + 12;
 }
@@ -228,16 +205,10 @@ function drawTable(doc, rows, x, y, w) {
     const rowH   = 7;
     const labelW = w * 0.55;
     rows.forEach(([label, value], i) => {
-        if (i % 2 === 0) {
-            doc.setFillColor(...LGRAY);
-            doc.rect(x, y - 1, w, rowH, 'F');
-        }
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(...DGRAY);
+        if (i % 2 === 0) { doc.setFillColor(...LGRAY); doc.rect(x, y - 1, w, rowH, 'F'); }
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...DGRAY);
         doc.text(label, x + 3, y + 4.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...NAVY);
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY);
         doc.text(String(value), x + labelW, y + 4.5, { align: 'left' });
         y += rowH;
     });
