@@ -1,6 +1,6 @@
 /* ============================================================
    TrueGrain Deck Builder — Mobile Optimization
-   mobile.css | v1.0 | Mobile Optimization Agent
+   mobile.css | v1.1 | Mobile Optimization Agent
    ============================================================
    Breakpoints:
      < 480px      small phones (iPhone SE, older Android)
@@ -42,45 +42,33 @@
    ---------------------------------------------------------- */
 @media (pointer: coarse) {
 
-    /* Primary and secondary buttons */
     .btn        { min-height: 48px; }
     .btn--small { min-height: 40px; }
 
-    /* Scene zoom / reset controls (were 40px) */
     .scene-control-btn { width: 44px; height: 44px; }
 
-    /* 3D view-mode toggle row */
     .view-btn { min-height: 40px; padding: var(--spacing-sm) var(--spacing-md); }
 
-    /* Step progress tabs */
     .progress-step { min-width: 48px; }
 
-    /* Range slider — thumb (were 20px) */
     .slider::-webkit-slider-thumb { width: 28px; height: 28px; }
     .slider::-moz-range-thumb     { width: 28px; height: 28px; }
 
-    /* Range slider — track height (was 6px) */
     .slider { height: 8px; }
 
-    /* Checkboxes */
     .checkbox-toggle                        { min-height: 44px; align-items: center; }
     .checkbox-toggle input[type="checkbox"] { width: 22px; height: 22px; }
 
-    /* Numeric step inputs */
     .number-input { min-height: 44px; width: 76px; }
 
-    /* Text / email / tel inputs */
     .text-input { min-height: 48px; }
 
-    /* Stair list action buttons (were 32px) */
     .stair-edit-btn,
     .stair-delete-btn { width: 44px; height: 44px; }
 
-    /* Undo / redo (were 36px) */
     .undo-btn,
     .redo-btn { width: 44px; height: 44px; }
 
-    /* Remove 300 ms tap delay + ghost tap highlight on all interactive els */
     .btn, .radio-card, .pattern-card, .color-swatch,
     .progress-step, .view-btn, .scene-control-btn,
     .direction-btn, .stair-edge-btn,
@@ -91,7 +79,6 @@
         -webkit-tap-highlight-color: transparent;
     }
 
-    /* Prevent long-press text-selection on card / button elements */
     .progress-step, .pattern-card, .radio-card,
     .direction-btn, .stair-edge-btn,
     .color-swatch, .view-btn, .btn {
@@ -101,19 +88,26 @@
 }
 
 /* ----------------------------------------------------------
-   THREE.JS CANVAS
-   Pass all touch events to OrbitControls so pinch-to-zoom
-   and one-finger orbit work correctly without page interference
+   THREE.JS CANVAS — UNCONDITIONAL
+   touch-action:none must be applied regardless of screen size
+   so pinch-to-zoom and orbit gestures are never intercepted
+   by the browser before the media query resolves.
    ---------------------------------------------------------- */
-@media (max-width: 1023px) {
-    #deckCanvas,
-    .scene-container { touch-action: none; }
+#deckCanvas,
+.scene-container {
+    touch-action: none;
+}
 
-    /* Prevent scroll chaining out of the wizard step content */
-    .step-content {
-        overscroll-behavior-y: contain;
-        -webkit-overflow-scrolling: touch;
-    }
+/* ----------------------------------------------------------
+   STEP CONTENT SCROLL
+   Contain overscroll on both axes:
+     Y — prevents rubber-band fighting the fixed wizard-nav footer
+     X — prevents Android Chrome back/forward swipe navigation
+   ---------------------------------------------------------- */
+.step-content {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
 }
 
 /* ----------------------------------------------------------
@@ -128,83 +122,79 @@
 }
 
 /* ----------------------------------------------------------
+   JOYSTICK BASE — SE CLAMP
+   Prevents the 110px joystick base from clipping off-screen
+   on 375px iPhones (iPhone SE 2nd/3rd gen).
+   left: 40px on wide phones, scales down on narrow ones.
+   ---------------------------------------------------------- */
+@media (max-width: 1023px) {
+    #wtJsBase {
+        left: min(40px, 5vw);
+    }
+}
+
+/* ----------------------------------------------------------
    SMALL PHONES  (< 480px)
-   iPhone SE (2nd/3rd gen), Galaxy A series, Moto G
    ---------------------------------------------------------- */
 @media (max-width: 479px) {
 
-    /* Tighter header to reclaim vertical space */
     :root               { --header-height: 56px; }
     .header             { padding: 0 var(--spacing-md); }
     .header__logo-image { height: 38px; }
 
-    /* 3D viewport — shorter to give more room to the wizard */
     .visualization-panel { height: 32vh; min-height: 200px; }
 
-    /* Tighter wizard content padding */
     .step-content { padding: var(--spacing-md); }
     .step__title  { font-size: var(--font-size-lg); }
     .step__desc   { margin-bottom: var(--spacing-md); }
     .form-group   { margin-bottom: var(--spacing-md); }
 
-    /* Pattern cards: 2 columns (main.css uses 1 col below 480px — improve to 2) */
     .pattern-cards { grid-template-columns: repeat(2, 1fr); }
 
-    /* Step 7 contact form: stack phone + ZIP into a single column */
     .form-row { grid-template-columns: 1fr; }
 
-    /* Inline radio cards — allow wrap on very tight screens */
     .radio-cards--inline { flex-wrap: wrap; }
     .radio-card--small   { min-width: 60px; }
 
-    /* Export buttons: full-width stacked */
     .export-actions      { flex-direction: column; }
     .export-actions .btn { width: 100%; min-height: 52px; }
 
-    /* Compact progress nav */
     .progress-step__label  { font-size: 9px; }
     .progress-step__number { width: 24px; height: 24px; font-size: 11px; }
 
-    /* Compact wizard nav footer */
     .wizard-nav { padding: var(--spacing-sm) var(--spacing-md); gap: var(--spacing-sm); }
 
-    /* View controls overlay on the 3D canvas */
     .view-controls { padding: var(--spacing-sm); gap: 4px; }
     .view-btn      { padding: 6px 10px; font-size: 11px; }
     #walkBtn       { padding: 6px 10px; font-size: 12px; }
 
-    /* Contact form */
     .contact-form { padding: var(--spacing-md); margin-top: var(--spacing-md); }
 
-    /* Review step — keep total cost readable */
     .review-total__value { font-size: var(--font-size-xl); }
 
-    /* Info card on step 1 */
     .info-card { gap: var(--spacing-sm); }
 
-    /* Optimization title — allow wrap instead of ellipsis on narrow screens */
     .optimization-recommendation__title { white-space: normal; }
 }
 
 /* ----------------------------------------------------------
-   LARGE PHONES  (480px – 639px)
+   LARGE PHONES  (480px - 639px)
    iPhone 14 / 15 Pro, Galaxy S series, Pixel 7+
    ---------------------------------------------------------- */
 @media (min-width: 480px) and (max-width: 639px) {
 
-    /* 3D viewport — a bit taller than small phone version */
     .visualization-panel { height: 36vh; min-height: 230px; }
 
-    /* Pattern cards: 2 columns (wizard fills full width in stacked layout) */
     .pattern-cards { grid-template-columns: repeat(2, 1fr); }
 
-    /* Bigger export button tap targets */
-    .export-actions .btn { min-height: 48px; }
+    /* FIX: export buttons full-width stacked on large phones too */
+    .export-actions      { flex-direction: column; }
+    .export-actions .btn { width: 100%; min-height: 48px; }
 }
 
 /* ----------------------------------------------------------
-   640px – 767px  (Gap in main.css — side-by-side starts at 768px)
-   Covers: landscape iPhones, small Android tablets in portrait
+   640px - 767px
+   Landscape iPhones, small Android tablets in portrait
    Force side-by-side so 3D preview and wizard are both visible
    ---------------------------------------------------------- */
 @media (min-width: 640px) and (max-width: 767px) {
@@ -237,16 +227,13 @@
 
 /* ----------------------------------------------------------
    LANDSCAPE PHONES
-   Wide (> 480px) but short (< 500px tall): iPhone SE/14 in
-   landscape, Galaxy in landscape. Force side-by-side layout
-   and compact controls so neither panel is clipped.
+   Wide (> 480px) but short (< 500px tall)
    ---------------------------------------------------------- */
 @media (max-width: 900px) and (max-height: 499px) and (orientation: landscape) {
 
     :root               { --header-height: 48px; }
     .header__logo-image { height: 32px; }
 
-    /* Override the stacked portrait layout */
     .main { flex-direction: row !important; }
 
     .wizard-panel {
@@ -269,25 +256,21 @@
         order: 2 !important;
     }
 
-    /* Compact everything for limited vertical space */
     .step-content { padding: var(--spacing-sm) var(--spacing-md); }
     .form-group   { margin-bottom: var(--spacing-sm); }
     .step__title  { font-size: var(--font-size-base); margin-bottom: var(--spacing-xs); }
     .step__desc   { font-size: var(--font-size-xs);   margin-bottom: var(--spacing-sm); }
 
-    /* Progress nav: hide text labels, show only step numbers */
     .progress-nav          { padding: var(--spacing-xs) var(--spacing-sm); }
     .progress-step__label  { display: none; }
     .progress-step__number { width: 22px; height: 22px; font-size: 10px; }
 
-    /* Wizard nav footer */
     .wizard-nav      { padding: var(--spacing-xs) var(--spacing-sm); gap: var(--spacing-sm); }
     .wizard-nav .btn { min-height: 40px; }
 }
 
 /* ----------------------------------------------------------
    HIGH-DPI SCREENS
-   Improve text crispness on Retina and AMOLED displays
    ---------------------------------------------------------- */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
     body {
@@ -298,7 +281,6 @@
 
 /* ----------------------------------------------------------
    KEYBOARD NAVIGATION ON TABLETS
-   Restore visible focus rings for iPad + physical keyboard
    ---------------------------------------------------------- */
 @media (pointer: fine) {
     .btn:focus-visible,
@@ -307,5 +289,34 @@
     .slider:focus-visible {
         outline: 2px solid var(--color-primary);
         outline-offset: 2px;
+    }
+}
+
+/* ----------------------------------------------------------
+   REDUCED MOTION
+   Disable transitions and animations for users who have
+   enabled "Reduce Motion" in iOS/Android accessibility settings.
+   Prevents vestibular disorder triggers.
+   ---------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    /* Keep spinner visible but stop spinning */
+    .spinner {
+        animation: none !important;
+        border-top-color: var(--color-primary, #1B2B4D);
+    }
+
+    /* Walkthrough HUD fade — instant instead of 0.3s */
+    #walkthroughHUD {
+        transition: none !important;
     }
 }
