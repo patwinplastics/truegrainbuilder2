@@ -1,5 +1,6 @@
 // ============================================================
-// TrueGrain Deck Builder 2 — PDF Export Service
+// TrueGrain Deck Builder 2 — PDF Export Service (Branded)
+// Brand colors: Navy #1B2A6B | Red #C8102E | White #FFFFFF
 // Requires jsPDF loaded via CDN script tag
 // ============================================================
 import { CONFIG }         from '../config.js';
@@ -7,96 +8,225 @@ import { state }          from '../state.js';
 import { getRenderer, getCamera, getScene } from '../3d/scene.js';
 import { formatCurrency } from '../ui/updates.js';
 
+// ── Brand palette ──────────────────────────────────────────
+const NAVY  = [27,  42, 107];   // #1B2A6B
+const RED   = [200, 16,  46];   // #C8102E
+const WHITE = [255, 255, 255];
+const LGRAY = [245, 246, 248];  // light row fill
+const DGRAY = [80,  80,  80];   // body text
+const RULE  = [210, 213, 222];  // subtle divider
+
 export function generatePDF() {
     if (!window.jspdf?.jsPDF) { alert('PDF library not loaded. Please refresh the page.'); return; }
     const { jsPDF } = window.jspdf;
-    const doc    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pw     = doc.internal.pageSize.getWidth();
-    const ph     = doc.internal.pageSize.getHeight();
-    const M      = 15;
-    let y        = M;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw  = doc.internal.pageSize.getWidth();   // 210
+    const ph  = doc.internal.pageSize.getHeight();  // 297
+    const M   = 14;   // page margin
+    let y     = 0;
 
-    // Header bar
-    doc.setFillColor(34, 34, 34);
-    doc.rect(0, 0, pw, 30, 'F');
-    try { doc.addImage(CONFIG.logoPath, 'PNG', M, 5, 50, 20); }
-    catch (_) { doc.setTextColor(255,255,255); doc.setFontSize(18); doc.text('TrueGrain Deck Builder', M, 18); }
-    doc.setTextColor(255, 255, 255); doc.setFontSize(10);
-    doc.text('Deck Material Estimate', pw - M, 18, { align: 'right' });
-    y = 40;
+    // ── 1. HEADER BAND ──────────────────────────────────────
+    // Navy background
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, pw, 36, 'F');
 
-    // 3D snapshot
+    // Red accent stripe at very top
+    doc.setFillColor(...RED);
+    doc.rect(0, 0, pw, 3, 'F');
+
+    // Logo (left side) — falls back to bold text if image unavailable
+    try {
+        doc.addImage(CONFIG.logoPath, 'PNG', M, 8, 62, 20);
+    } catch (_) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(...WHITE);
+        doc.text('TrueGrain', M, 20);
+        doc.setTextColor(...RED);
+        doc.text('Decking', M + 33, 20);
+    }
+
+    // Document title (right side)
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...WHITE);
+    doc.text('DECK MATERIAL ESTIMATE', pw - M, 16, { align: 'right' });
+    doc.setFontSize(8);
+    doc.setTextColor(180, 190, 220);
+    doc.text(`Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`, pw - M, 22, { align: 'right' });
+
+    y = 44;
+
+    // ── 2. 3D SNAPSHOT ──────────────────────────────────────
     try {
         const rnd = getRenderer(), cam = getCamera(), scn = getScene();
         if (rnd && cam && scn) {
             rnd.render(scn, cam);
-            doc.addImage(rnd.domElement.toDataURL('image/jpeg', 0.85), 'JPEG', M, y, pw - 2 * M, 60);
-            y += 65;
+            const imgW = pw - 2 * M;
+            const imgH = 56;
+            // thin navy border around snapshot
+            doc.setDrawColor(...NAVY);
+            doc.setLineWidth(0.4);
+            doc.roundedRect(M, y, imgW, imgH, 2, 2, 'S');
+            doc.addImage(rnd.domElement.toDataURL('image/jpeg', 0.88), 'JPEG', M, y, imgW, imgH, '', 'FAST');
+            y += imgH + 8;
         }
     } catch (_) {}
 
     const r = state.results;
 
-    // Config section
-    y = addSection(doc, 'Deck Configuration', M, y);
-    [
-        ['Size',    `${state.deckLength}' x ${state.deckWidth}' (${(state.deckLength*state.deckWidth).toFixed(0)} sq ft)`],
-        ['Height',  `${state.deckHeight}'`],
-        ['Pattern', state.pattern.replace(/-/g, ' ')],
-        ['Color',   CONFIG.colors.find(c => c.id === state.mainColor)?.name || state.mainColor],
-        ['Railings',state.showRailings ? 'Yes' : 'No'],
-        ['Stairs',  state.stairsEnabled ? `${state.stairs.length} set(s)` : 'None']
-    ].forEach(([l, v]) => { y = addRow(doc, l, v, M, y); });
+    // ── 3. TWO-COLUMN CONTENT AREA ──────────────────────────
+    const colW  = (pw - 2 * M - 6) / 2;   // width of each column
+    const colR  = M + colW + 6;            // x-start of right column
+    let   yL    = y;                       // left col cursor
+    let   yR    = y;                       // right col cursor
 
-    // Materials section
-    y = addSection(doc, 'Material Summary', M, y + 4);
+    // LEFT: Deck Configuration
+    yL = drawSectionHeader(doc, 'Deck Configuration', M, yL, colW);
+    const configRows = [
+        ['Size',     `${state.deckLength}' x ${state.deckWidth}' (${(state.deckLength * state.deckWidth).toFixed(0)} sq ft)`],
+        ['Height',   `${state.deckHeight}'`],
+        ['Pattern',  capitalize(state.pattern.replace(/-/g, ' '))],
+        ['Color',    CONFIG.colors.find(c => c.id === state.mainColor)?.name || state.mainColor],
+        ['Railings', state.showRailings ? 'Yes' : 'No'],
+        ['Stairs',   state.stairsEnabled ? `${state.stairs.length} set(s)` : 'None']
+    ];
+    yL = drawTable(doc, configRows, M, yL, colW);
+
+    // RIGHT: Material Summary
+    yR = drawSectionHeader(doc, 'Material Summary', colR, yR, colW);
     if (r?.boards) {
-        [
-            ['Total Boards', `${r.boards.total} boards (${r.boards.linealFeet.toFixed(0)} LF)`],
-            ["12' Boards",   r.boards.byLength[12] || 0],
-            ["16' Boards",   r.boards.byLength[16] || 0],
-            ["20' Boards",   r.boards.byLength[20] || 0],
-            ['Clip Boxes',   r.hardware.clipBoxes],
-            ['Screw Boxes',  r.hardware.screwBoxes]
-        ].forEach(([l, v]) => { y = addRow(doc, l, String(v), M, y); });
+        const matRows = [
+            ['Total Boards', `${r.boards.total} (${r.boards.linealFeet.toFixed(0)} LF)`],
+            ["12' Boards",   String(r.boards.byLength[12] || 0)],
+            ["16' Boards",   String(r.boards.byLength[16] || 0)],
+            ["20' Boards",   String(r.boards.byLength[20] || 0)],
+            ['Clip Boxes',   String(r.hardware.clipBoxes)],
+            ['Screw Boxes',  String(r.hardware.screwBoxes)]
+        ];
+        yR = drawTable(doc, matRows, colR, yR, colW);
     }
 
-    // Costs section
-    y = addSection(doc, 'Cost Estimate', M, y + 4);
+    // Sync y to the taller column + gap
+    y = Math.max(yL, yR) + 8;
+
+    // ── 4. COST ESTIMATE — FULL WIDTH HIGHLIGHT BOX ─────────
     if (r?.costs) {
         const c = r.costs;
-        [
-            ['Materials (low)',  formatCurrency(c.materials.total.low)],
-            ['Materials (high)', formatCurrency(c.materials.total.high)],
-            ['Hardware',         formatCurrency(c.hardware.total)],
-            ['Total (low)',      formatCurrency(c.grandTotal.materialsOnly.low)],
-            ['Total (high)',     formatCurrency(c.grandTotal.materialsOnly.high)]
-        ].forEach(([l, v]) => { y = addRow(doc, l, v, M, y); });
+        y = drawSectionHeader(doc, 'Cost Estimate', M, y, pw - 2 * M);
+
+        const costRows = [
+            ['Materials (low)',   formatCurrency(c.materials.total.low)],
+            ['Materials (high)',  formatCurrency(c.materials.total.high)],
+            ['Hardware',          formatCurrency(c.hardware.total)],
+        ];
+        y = drawTable(doc, costRows, M, y, pw - 2 * M);
+
+        // Grand total highlight row
+        const totLow  = formatCurrency(c.grandTotal.materialsOnly.low);
+        const totHigh = formatCurrency(c.grandTotal.materialsOnly.high);
+        const rowH    = 10;
+        doc.setFillColor(...NAVY);
+        doc.roundedRect(M, y, pw - 2 * M, rowH, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(...WHITE);
+        doc.text('Estimated Total Range', M + 4, y + 6.5);
+        doc.text(`${totLow} – ${totHigh}`, pw - M - 4, y + 6.5, { align: 'right' });
+        y += rowH + 8;
     }
 
-    // Contact
+    // ── 5. PREPARED FOR ─────────────────────────────────────
     if (state.contactName || state.contactEmail) {
-        y = addSection(doc, 'Prepared For', M, y + 4);
-        [state.contactName, state.contactEmail, state.contactPhone, state.contactZip ? `Zip: ${state.contactZip}` : '']
-            .filter(Boolean).forEach(line => { doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.text(line, M, y); y += 5; });
+        y = drawSectionHeader(doc, 'Prepared For', M, y, pw - 2 * M);
+        const lines = [
+            state.contactName,
+            state.contactEmail,
+            state.contactPhone,
+            state.contactZip ? `Zip: ${state.contactZip}` : ''
+        ].filter(Boolean);
+
+        doc.setFillColor(...LGRAY);
+        doc.roundedRect(M, y, pw - 2 * M, lines.length * 6 + 6, 2, 2, 'F');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(...DGRAY);
+        lines.forEach((line, i) => {
+            if (i === 0) { doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY); }
+            else         { doc.setFont('helvetica', 'normal'); doc.setTextColor(...DGRAY); }
+            doc.text(line, M + 4, y + 5 + i * 6);
+        });
+        y += lines.length * 6 + 10;
     }
 
-    // Footer
-    doc.setFillColor(34, 34, 34); doc.rect(0, ph - 20, pw, 20, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(8);
-    doc.text(`${CONFIG.companyInfo.phone} | ${CONFIG.companyInfo.email} | ${CONFIG.companyInfo.address}`, pw / 2, ph - 10, { align: 'center' });
-    doc.text(`Generated ${new Date().toLocaleDateString()}`, pw / 2, ph - 5, { align: 'center' });
+    // ── 6. DISCLAIMER ────────────────────────────────────────
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(150, 150, 160);
+    const disclaimer = 'This estimate is for material quantities only and does not include labor, permits, or installation costs. Prices subject to change without notice. Contact us for a full project quote.';
+    const dLines = doc.splitTextToSize(disclaimer, pw - 2 * M);
+    doc.text(dLines, M, y);
+
+    // ── 7. FOOTER BAND ───────────────────────────────────────
+    // Red rule above footer
+    doc.setFillColor(...RED);
+    doc.rect(0, ph - 22, pw, 1.5, 'F');
+
+    doc.setFillColor(...NAVY);
+    doc.rect(0, ph - 20.5, pw, 20.5, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...WHITE);
+    doc.text(CONFIG.companyInfo.phone, pw / 2, ph - 13, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 190, 220);
+    doc.text(`${CONFIG.companyInfo.email}  |  ${CONFIG.companyInfo.address}`, pw / 2, ph - 8, { align: 'center' });
+    doc.text('Feels Real. Lasts Longer.  by American PRO', pw / 2, ph - 3.5, { align: 'center' });
+
     doc.save(`TrueGrain-Deck-Estimate-${state.deckLength}x${state.deckWidth}.pdf`);
 }
 
-function addSection(doc, title, x, y) {
-    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.setTextColor(34, 34, 34);
-    doc.text(title, x, y);
-    return y + 7;
+// ── Helpers ──────────────────────────────────────────────────
+
+function drawSectionHeader(doc, title, x, y, w) {
+    // Navy left accent bar + label
+    doc.setFillColor(...NAVY);
+    doc.rect(x, y, 3, 6.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...NAVY);
+    doc.text(title.toUpperCase(), x + 6, y + 5.5);
+    // underline rule
+    doc.setDrawColor(...RULE);
+    doc.setLineWidth(0.3);
+    doc.line(x, y + 8, x + w, y + 8);
+    return y + 12;
 }
-function addRow(doc, label, value, x, y) {
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');  doc.text(label + ':', x, y);
-    doc.setFont(undefined, 'normal'); doc.text(String(value), x + 55, y);
-    return y + 6;
+
+function drawTable(doc, rows, x, y, w) {
+    const rowH   = 7;
+    const labelW = w * 0.55;
+    rows.forEach(([ label, value ], i) => {
+        // Alternating row backgrounds
+        if (i % 2 === 0) {
+            doc.setFillColor(...LGRAY);
+            doc.rect(x, y - 1, w, rowH, 'F');
+        }
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...DGRAY);
+        doc.text(label, x + 3, y + 4.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...NAVY);
+        doc.text(String(value), x + labelW, y + 4.5, { align: 'left' });
+        y += rowH;
+    });
+    return y + 3;
+}
+
+function capitalize(str) {
+    return str.replace(/\b\w/g, c => c.toUpperCase());
 }
