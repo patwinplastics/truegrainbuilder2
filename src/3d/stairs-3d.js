@@ -1,7 +1,8 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Stair 3D Geometry
-// v4.8 — stringer bottom closes correctly at last plumb cut foot
-//         no longer draws diagonal back to origin (no filled wedge)
+// v4.9 — stringer bottom is a true diagonal parallel to slope
+//         bottomBackY = -(ST.w * diagLen / totalRunFt)  (~12" for 2x10)
+//         back face only spans that short distance, not full rise
 // ============================================================
 import { CONFIG }              from '../config.js';
 import { state }               from '../state.js';
@@ -146,22 +147,26 @@ function buildRailingSegment(parent, mat, x1, z1, x2, z2, surfY) {
 //
 // 2D shape coordinate system:
 //   u (local X) = run direction, positive away from deck
-//   v (local Y) = height, positive up / negative down
-//   origin (0,0) = top of stringer at deck edge
+//   v (local Y) = vertical, positive up / negative down
+//   origin (0,0) = top-back corner at deck surface
 //
-// Shape sequence:
-//   1. Start at top-back corner (0, 0)
-//   2. Initial plumb cut: down one rise to (0, -rise)
-//   3. For each tread i = 0..numTreads-1:
-//      a. Seat cut (horizontal): forward one tread depth
-//      b. Plumb cut (vertical):  down one rise
-//   4. After last plumb cut we are at (totalRunFt, -totalRiseFt)
-//      i.e. the bottom-front corner — the foot of the stringer.
-//      Close the shape by drawing straight back along the board
-//      bottom to the back edge, then straight up to the origin.
-//      The board bottom is at v = -totalRiseFt (ground level at
-//      the foot) — NOT a diagonal back to x=0.
-//      This produces a proper notched board shape with no wedge fill.
+// Top edge (notched):
+//   (0,0) → initial plumb cut → seat+plumb per tread → foot (totalRunFt, -totalRiseFt)
+//
+// Bottom edge (DIAGONAL, parallel to slope):
+//   The board has width ST.w (e.g. 9.25" for 2x10), measured perpendicular
+//   to the stringer's slope. Projecting that onto the vertical back face gives:
+//
+//     bottomBackY = -(ST.w * diagLen / totalRunFt)
+//                 = -(ST.w / cos(slopeAngle))
+//
+//   For a typical 7" rise / 10" run stair this is about -11.7" — one board
+//   width below the origin. The bottom edge is then a single diagonal line
+//   from the foot (totalRunFt, -totalRiseFt) back to (0, bottomBackY).
+//   The back face closes vertically from (0, bottomBackY) up to (0, 0).
+//
+//   This produces a proper notched-board silhouette with NO filled wedge
+//   and NO solid slab reaching the ground.
 // ============================================================
 function buildNotchedStringer(
     parent, mat,
@@ -174,30 +179,37 @@ function buildNotchedStringer(
     const totalRunFt  = numTreads * treadDepthFt;
     const runsX = Math.abs(dirX) > 0.5;
 
-    // ---- 2D profile ----------------------------------------
+    // Diagonal length of the stringer (hypotenuse of rise/run triangle)
+    const diagLen     = Math.sqrt(totalRunFt * totalRunFt + totalRiseFt * totalRiseFt);
+    // Vertical distance from origin to board bottom on the back face
+    // = board width (ST.w) divided by cos(slope) = ST.w * diagLen / totalRunFt
+    const bottomBackY = -(ST.w * diagLen / totalRunFt);
+
+    // ---- 2D notched top profile ----------------------------
     const shape = new THREE.Shape();
-    shape.moveTo(0, 0);                              // top-back corner
-    shape.lineTo(0, -risePerStepFt);                 // initial plumb cut
+    shape.moveTo(0, 0);                       // top-back corner
+    shape.lineTo(0, -risePerStepFt);          // initial plumb cut
 
     for (let i = 0; i < numTreads; i++) {
         const u = (i + 1) * treadDepthFt;
         const v = -(i + 1) * risePerStepFt;
-        shape.lineTo(u, v);                          // seat cut (horizontal)
-        shape.lineTo(u, v - risePerStepFt);          // plumb cut (vertical)
+        shape.lineTo(u, v);               // seat cut (horizontal)
+        shape.lineTo(u, v - risePerStepFt); // plumb cut (vertical)
     }
+    // Now at foot: (totalRunFt, -totalRiseFt)
 
-    // Now at (totalRunFt, -totalRiseFt) — foot of stringer.
-    // Close correctly: horizontal back along bottom, then vertical up.
-    // This gives a proper board profile — NOT a diagonal wedge.
-    shape.lineTo(0, -totalRiseFt);                   // bottom edge (horizontal back)
-    shape.lineTo(0, 0);                              // back face up to origin
+    // ---- Bottom edge: diagonal from foot back to back face -
+    // This line is parallel to the overall stringer slope.
+    // It represents the underside of the board — NOT the ground.
+    shape.lineTo(0, bottomBackY);             // diagonal bottom (one board-width deep)
+    shape.lineTo(0, 0);                       // back face (short: only ~12" for 2x10)
 
-    // ---- Extrude (local Z becomes lateral thickness) -------
+    // ---- Extrude laterally (thickness = ST.th = 1.5") ------
     const geom = new THREE.ExtrudeGeometry(shape, { depth: ST.th, bevelEnabled: false });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.castShadow = true;
 
-    // ---- Rotate so shape-X = run direction -----------------
+    // ---- Rotate so shape-X aligns with run direction -------
     if (runsX) {
         if (dirX < 0) mesh.rotation.y = Math.PI;
     } else {
