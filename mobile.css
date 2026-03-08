@@ -1,0 +1,311 @@
+/* ============================================================
+   TrueGrain Deck Builder — Mobile Optimization
+   mobile.css | v1.0 | Mobile Optimization Agent
+   ============================================================
+   Breakpoints:
+     < 480px      small phones (iPhone SE, older Android)
+     480–639px    large phones (iPhone 14 Pro, Galaxy S)
+     640–767px    landscape phones / small tablets
+     768–1023px   tablets  (main.css handles side-by-side at 768px)
+     >= 1024px    desktop
+   ============================================================ */
+
+/* ----------------------------------------------------------
+   SAFE AREA INSETS
+   Protects content from notch, Dynamic Island, and home bar
+   on iPhone X and later — works in Mobile Safari and Chrome iOS
+   ---------------------------------------------------------- */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .header {
+        padding-left:  max(var(--spacing-lg), env(safe-area-inset-left));
+        padding-right: max(var(--spacing-lg), env(safe-area-inset-right));
+    }
+
+    .wizard-nav {
+        padding-bottom: max(var(--spacing-lg), env(safe-area-inset-bottom));
+    }
+
+    .scene-controls {
+        right:  max(var(--spacing-md), env(safe-area-inset-right));
+        bottom: max(var(--spacing-md), env(safe-area-inset-bottom));
+    }
+
+    .view-controls {
+        padding-left: max(var(--spacing-md), env(safe-area-inset-left));
+    }
+}
+
+/* ----------------------------------------------------------
+   TOUCH TARGETS
+   WCAG 2.5.5 AA / Apple HIG: minimum 44x44 CSS px
+   Scoped to pointer:coarse so desktop is completely untouched
+   ---------------------------------------------------------- */
+@media (pointer: coarse) {
+
+    /* Primary and secondary buttons */
+    .btn        { min-height: 48px; }
+    .btn--small { min-height: 40px; }
+
+    /* Scene zoom / reset controls (were 40px) */
+    .scene-control-btn { width: 44px; height: 44px; }
+
+    /* 3D view-mode toggle row */
+    .view-btn { min-height: 40px; padding: var(--spacing-sm) var(--spacing-md); }
+
+    /* Step progress tabs */
+    .progress-step { min-width: 48px; }
+
+    /* Range slider — thumb (were 20px) */
+    .slider::-webkit-slider-thumb { width: 28px; height: 28px; }
+    .slider::-moz-range-thumb     { width: 28px; height: 28px; }
+
+    /* Range slider — track height (was 6px) */
+    .slider { height: 8px; }
+
+    /* Checkboxes */
+    .checkbox-toggle                        { min-height: 44px; align-items: center; }
+    .checkbox-toggle input[type="checkbox"] { width: 22px; height: 22px; }
+
+    /* Numeric step inputs */
+    .number-input { min-height: 44px; width: 76px; }
+
+    /* Text / email / tel inputs */
+    .text-input { min-height: 48px; }
+
+    /* Stair list action buttons (were 32px) */
+    .stair-edit-btn,
+    .stair-delete-btn { width: 44px; height: 44px; }
+
+    /* Undo / redo (were 36px) */
+    .undo-btn,
+    .redo-btn { width: 44px; height: 44px; }
+
+    /* Remove 300 ms tap delay + ghost tap highlight on all interactive els */
+    .btn, .radio-card, .pattern-card, .color-swatch,
+    .progress-step, .view-btn, .scene-control-btn,
+    .direction-btn, .stair-edge-btn,
+    .stair-edit-btn, .stair-delete-btn,
+    .undo-btn, .redo-btn,
+    .header__help-btn, #walkBtn {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Prevent long-press text-selection on card / button elements */
+    .progress-step, .pattern-card, .radio-card,
+    .direction-btn, .stair-edge-btn,
+    .color-swatch, .view-btn, .btn {
+        -webkit-user-select: none;
+        user-select: none;
+    }
+}
+
+/* ----------------------------------------------------------
+   THREE.JS CANVAS
+   Pass all touch events to OrbitControls so pinch-to-zoom
+   and one-finger orbit work correctly without page interference
+   ---------------------------------------------------------- */
+@media (max-width: 1023px) {
+    #deckCanvas,
+    .scene-container { touch-action: none; }
+
+    /* Prevent scroll chaining out of the wizard step content */
+    .step-content {
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* ----------------------------------------------------------
+   WALKTHROUGH HUD OVERFLOW FIX
+   min-width: 340px was overflowing on 375px iPhone and below
+   ---------------------------------------------------------- */
+@media (max-width: 767px) {
+    .wt-hud__inner {
+        min-width: min(340px, calc(100vw - 32px)) !important;
+        box-sizing: border-box;
+    }
+}
+
+/* ----------------------------------------------------------
+   SMALL PHONES  (< 480px)
+   iPhone SE (2nd/3rd gen), Galaxy A series, Moto G
+   ---------------------------------------------------------- */
+@media (max-width: 479px) {
+
+    /* Tighter header to reclaim vertical space */
+    :root               { --header-height: 56px; }
+    .header             { padding: 0 var(--spacing-md); }
+    .header__logo-image { height: 38px; }
+
+    /* 3D viewport — shorter to give more room to the wizard */
+    .visualization-panel { height: 32vh; min-height: 200px; }
+
+    /* Tighter wizard content padding */
+    .step-content { padding: var(--spacing-md); }
+    .step__title  { font-size: var(--font-size-lg); }
+    .step__desc   { margin-bottom: var(--spacing-md); }
+    .form-group   { margin-bottom: var(--spacing-md); }
+
+    /* Pattern cards: 2 columns (main.css uses 1 col below 480px — improve to 2) */
+    .pattern-cards { grid-template-columns: repeat(2, 1fr); }
+
+    /* Step 7 contact form: stack phone + ZIP into a single column */
+    .form-row { grid-template-columns: 1fr; }
+
+    /* Inline radio cards — allow wrap on very tight screens */
+    .radio-cards--inline { flex-wrap: wrap; }
+    .radio-card--small   { min-width: 60px; }
+
+    /* Export buttons: full-width stacked */
+    .export-actions      { flex-direction: column; }
+    .export-actions .btn { width: 100%; min-height: 52px; }
+
+    /* Compact progress nav */
+    .progress-step__label  { font-size: 9px; }
+    .progress-step__number { width: 24px; height: 24px; font-size: 11px; }
+
+    /* Compact wizard nav footer */
+    .wizard-nav { padding: var(--spacing-sm) var(--spacing-md); gap: var(--spacing-sm); }
+
+    /* View controls overlay on the 3D canvas */
+    .view-controls { padding: var(--spacing-sm); gap: 4px; }
+    .view-btn      { padding: 6px 10px; font-size: 11px; }
+    #walkBtn       { padding: 6px 10px; font-size: 12px; }
+
+    /* Contact form */
+    .contact-form { padding: var(--spacing-md); margin-top: var(--spacing-md); }
+
+    /* Review step — keep total cost readable */
+    .review-total__value { font-size: var(--font-size-xl); }
+
+    /* Info card on step 1 */
+    .info-card { gap: var(--spacing-sm); }
+
+    /* Optimization title — allow wrap instead of ellipsis on narrow screens */
+    .optimization-recommendation__title { white-space: normal; }
+}
+
+/* ----------------------------------------------------------
+   LARGE PHONES  (480px – 639px)
+   iPhone 14 / 15 Pro, Galaxy S series, Pixel 7+
+   ---------------------------------------------------------- */
+@media (min-width: 480px) and (max-width: 639px) {
+
+    /* 3D viewport — a bit taller than small phone version */
+    .visualization-panel { height: 36vh; min-height: 230px; }
+
+    /* Pattern cards: 2 columns (wizard fills full width in stacked layout) */
+    .pattern-cards { grid-template-columns: repeat(2, 1fr); }
+
+    /* Bigger export button tap targets */
+    .export-actions .btn { min-height: 48px; }
+}
+
+/* ----------------------------------------------------------
+   640px – 767px  (Gap in main.css — side-by-side starts at 768px)
+   Covers: landscape iPhones, small Android tablets in portrait
+   Force side-by-side so 3D preview and wizard are both visible
+   ---------------------------------------------------------- */
+@media (min-width: 640px) and (max-width: 767px) {
+    .main {
+        flex-direction: row;
+    }
+
+    .wizard-panel {
+        width: 320px;
+        flex-shrink: 0;
+        height: calc(100dvh - var(--header-height));
+        height: calc(100vh  - var(--header-height));
+        position: sticky;
+        top: var(--header-height);
+        order: 1;
+        border-right: 1px solid var(--color-border);
+        border-top: none;
+        overflow-y: auto;
+    }
+
+    .visualization-panel {
+        flex: 1;
+        height: calc(100dvh - var(--header-height));
+        height: calc(100vh  - var(--header-height));
+        position: sticky;
+        top: var(--header-height);
+        order: 2;
+    }
+}
+
+/* ----------------------------------------------------------
+   LANDSCAPE PHONES
+   Wide (> 480px) but short (< 500px tall): iPhone SE/14 in
+   landscape, Galaxy in landscape. Force side-by-side layout
+   and compact controls so neither panel is clipped.
+   ---------------------------------------------------------- */
+@media (max-width: 900px) and (max-height: 499px) and (orientation: landscape) {
+
+    :root               { --header-height: 48px; }
+    .header__logo-image { height: 32px; }
+
+    /* Override the stacked portrait layout */
+    .main { flex-direction: row !important; }
+
+    .wizard-panel {
+        width: 280px !important;
+        flex-shrink: 0;
+        height: calc(100dvh - 48px);
+        height: calc(100vh  - 48px);
+        position: sticky;
+        top: 48px;
+        order: 1 !important;
+        border-right: 1px solid var(--color-border);
+        border-top: none !important;
+        overflow-y: auto;
+    }
+
+    .visualization-panel {
+        flex: 1;
+        height: calc(100dvh - 48px);
+        height: calc(100vh  - 48px);
+        order: 2 !important;
+    }
+
+    /* Compact everything for limited vertical space */
+    .step-content { padding: var(--spacing-sm) var(--spacing-md); }
+    .form-group   { margin-bottom: var(--spacing-sm); }
+    .step__title  { font-size: var(--font-size-base); margin-bottom: var(--spacing-xs); }
+    .step__desc   { font-size: var(--font-size-xs);   margin-bottom: var(--spacing-sm); }
+
+    /* Progress nav: hide text labels, show only step numbers */
+    .progress-nav          { padding: var(--spacing-xs) var(--spacing-sm); }
+    .progress-step__label  { display: none; }
+    .progress-step__number { width: 22px; height: 22px; font-size: 10px; }
+
+    /* Wizard nav footer */
+    .wizard-nav      { padding: var(--spacing-xs) var(--spacing-sm); gap: var(--spacing-sm); }
+    .wizard-nav .btn { min-height: 40px; }
+}
+
+/* ----------------------------------------------------------
+   HIGH-DPI SCREENS
+   Improve text crispness on Retina and AMOLED displays
+   ---------------------------------------------------------- */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+/* ----------------------------------------------------------
+   KEYBOARD NAVIGATION ON TABLETS
+   Restore visible focus rings for iPad + physical keyboard
+   ---------------------------------------------------------- */
+@media (pointer: fine) {
+    .btn:focus-visible,
+    .radio-card:focus-visible,
+    .pattern-card:focus-visible,
+    .slider:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+}

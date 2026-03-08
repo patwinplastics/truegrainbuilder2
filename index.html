@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1B2B4D">
     <title>TrueGrain Deck Designer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="main.css">
     <link rel="stylesheet" href="stair-styles.css">
+    <link rel="stylesheet" href="mobile.css">
     <style>
         .wizard-step        { display: none; }
         .wizard-step.active { display: block; }
@@ -30,7 +32,8 @@
             background: rgba(0,0,0,0.68); backdrop-filter: blur(8px);
             border-radius: 20px; padding: 10px 22px 8px;
             display: flex; flex-direction: column; align-items: center;
-            gap: 6px; min-width: 340px; pointer-events: none;
+            gap: 6px; min-width: min(340px, calc(100vw - 32px)); pointer-events: none;
+            box-sizing: border-box;
         }
         .wt-hud__inner--touch { pointer-events: auto; }
         .wt-hud__keys-row { width: 100%; text-align: center; }
@@ -169,7 +172,7 @@
                             <label class="form-label">Length (feet)</label>
                             <div class="slider-input">
                                 <input type="range" id="lengthSlider" class="slider" min="8" max="40" value="16" step="1">
-                                <input type="number" id="lengthInput" class="number-input" min="8" max="40" value="16">
+                                <input type="number" id="lengthInput" class="number-input" min="8" max="40" value="16" inputmode="numeric">
                                 <span class="unit">ft</span>
                             </div>
                         </div>
@@ -177,7 +180,7 @@
                             <label class="form-label">Width (feet)</label>
                             <div class="slider-input">
                                 <input type="range" id="widthSlider" class="slider" min="8" max="30" value="12" step="1">
-                                <input type="number" id="widthInput" class="number-input" min="8" max="30" value="12">
+                                <input type="number" id="widthInput" class="number-input" min="8" max="30" value="12" inputmode="numeric">
                                 <span class="unit">ft</span>
                             </div>
                         </div>
@@ -185,7 +188,7 @@
                             <label class="form-label">Deck Height (feet)</label>
                             <div class="slider-input">
                                 <input type="range" id="heightSlider" class="slider" min="0.5" max="8" value="2" step="0.5">
-                                <input type="number" id="heightInput" class="number-input" min="0.5" max="8" value="2" step="0.5">
+                                <input type="number" id="heightInput" class="number-input" min="0.5" max="8" value="2" step="0.5" inputmode="decimal">
                                 <span class="unit">ft</span>
                             </div>
                             <p class="form-hint">Height from ground to deck surface</p>
@@ -244,7 +247,7 @@
                             <label class="form-label">Border Width (boards)</label>
                             <div class="slider-input">
                                 <input type="range" id="borderWidthSlider" class="slider" min="1" max="3" value="1" step="1">
-                                <input type="number" id="borderWidthInput" class="number-input" min="1" max="3" value="1">
+                                <input type="number" id="borderWidthInput" class="number-input" min="1" max="3" value="1" inputmode="numeric">
                             </div>
                         </div>
                         <div class="form-group hidden" id="breakerColorSection">
@@ -298,7 +301,7 @@
                                     <label class="form-label">Stair Width (feet)</label>
                                     <div class="slider-input">
                                         <input type="range" id="stairWidthSlider" class="slider" min="3" max="8" value="4" step="0.5">
-                                        <input type="number" id="stairWidthInput" class="number-input" min="3" max="8" value="4" step="0.5">
+                                        <input type="number" id="stairWidthInput" class="number-input" min="3" max="8" value="4" step="0.5" inputmode="decimal">
                                         <span class="unit">ft</span>
                                     </div>
                                     <p class="form-hint">Minimum 36" for code compliance.</p>
@@ -332,7 +335,7 @@
                                     <div class="form-group landing-step-group">
                                         <label class="form-label" for="landingStepInput">Landing after riser #</label>
                                         <div class="landing-step-row">
-                                            <input type="number" id="landingStepInput" min="1" step="1" placeholder="auto">
+                                            <input type="number" id="landingStepInput" min="1" step="1" placeholder="auto" inputmode="numeric">
                                             <span class="landing-step-hint" id="landingStepRange"></span>
                                         </div>
                                         <div class="landing-step-display" id="landingStepDisplay"></div>
@@ -369,7 +372,7 @@
                             <label class="form-label">Waste Factor</label>
                             <div class="slider-input">
                                 <input type="range" id="wasteSlider" class="slider" min="5" max="20" value="10" step="1">
-                                <input type="number" id="wasteInput" class="number-input" min="5" max="20" value="10">
+                                <input type="number" id="wasteInput" class="number-input" min="5" max="20" value="10" inputmode="numeric">
                                 <span class="unit">%</span>
                             </div>
                             <p class="form-hint">Industry standard is 10%.</p>
@@ -378,7 +381,7 @@
                             <label class="form-label">Price Per Linear Foot</label>
                             <div class="slider-input">
                                 <input type="range" id="priceSlider" class="slider" min="7" max="13" value="10" step="0.25">
-                                <input type="number" id="priceInput" class="number-input" min="2" max="10" value="6" step="0.25">
+                                <input type="number" id="priceInput" class="number-input" min="2" max="10" value="6" step="0.25" inputmode="decimal">
                                 <span class="unit">$/LF</span>
                             </div>
                         </div>
@@ -465,11 +468,11 @@
                         </div>
                         <div class="contact-form">
                             <h3>Get a Quote</h3>
-                            <div class="form-group"><label class="form-label">Name</label><input type="text" id="contactName" class="text-input" placeholder="Your name"></div>
-                            <div class="form-group"><label class="form-label">Email</label><input type="email" id="contactEmail" class="text-input" placeholder="you@email.com"></div>
+                            <div class="form-group"><label class="form-label">Name</label><input type="text" id="contactName" class="text-input" placeholder="Your name" autocomplete="name" enterkeyhint="next"></div>
+                            <div class="form-group"><label class="form-label">Email</label><input type="email" id="contactEmail" class="text-input" placeholder="you@email.com" autocomplete="email" enterkeyhint="next"></div>
                             <div class="form-row">
-                                <div class="form-group"><label class="form-label">Phone</label><input type="tel" id="contactPhone" class="text-input" placeholder="555-123-4567"></div>
-                                <div class="form-group"><label class="form-label">ZIP Code</label><input type="text" id="contactZip" class="text-input" placeholder="12345"></div>
+                                <div class="form-group"><label class="form-label">Phone</label><input type="tel" id="contactPhone" class="text-input" placeholder="555-123-4567" autocomplete="tel" inputmode="tel" enterkeyhint="next"></div>
+                                <div class="form-group"><label class="form-label">ZIP Code</label><input type="text" id="contactZip" class="text-input" placeholder="12345" autocomplete="postal-code" inputmode="numeric" enterkeyhint="done"></div>
                             </div>
                         </div>
                         <div class="export-actions">
