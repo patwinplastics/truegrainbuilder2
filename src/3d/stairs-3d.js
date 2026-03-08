@@ -1,6 +1,7 @@
 // ============================================================
 // TrueGrain Deck Builder 2 — Stair 3D Geometry
-// v4.3 — landing side riser where flight 2 meets platform
+// v4.4 — notched center stringer, solid side stringers,
+//         correct orientation for all 4 deck edges
 // ============================================================
 import { CONFIG }              from '../config.js';
 import { state }               from '../state.js';
@@ -72,20 +73,34 @@ const handrailMat = () => {
     return materialCache['_handrail'];
 };
 
+// ============================================================
+// Stringer position table
+// isCenter flags which entries get the notched profile
+// ============================================================
 function getStringerPositions(stairWidthFt) {
-    const sideL = -stairWidthFt/2 + ST.in;
-    const sideR =  stairWidthFt/2 - ST.in;
-    const cy = -(ST.w + BOARD_TH);
+    const sideL = -stairWidthFt / 2 + ST.in;
+    const sideR =  stairWidthFt / 2 - ST.in;
+    const cy    = -(ST.w + BOARD_TH);   // vertical offset so notch top aligns under tread
+
     if (stairWidthFt < (CONFIG.stairs.centerStringerMinWidth ?? 3))
-        return [{ lat: sideL, yOff: 0 }, { lat: sideR, yOff: 0 }];
+        return [
+            { lat: sideL, yOff: 0,  isCenter: false },
+            { lat: sideR, yOff: 0,  isCenter: false }
+        ];
+
     if (stairWidthFt < (CONFIG.stairs.doubleCenterStringerMinWidth ?? 6))
-        return [{ lat: sideL, yOff: 0 }, { lat: 0, yOff: cy }, { lat: sideR, yOff: 0 }];
-    const t = stairWidthFt/3;
+        return [
+            { lat: sideL, yOff: 0,  isCenter: false },
+            { lat: 0,     yOff: cy, isCenter: true  },
+            { lat: sideR, yOff: 0,  isCenter: false }
+        ];
+
+    const t = stairWidthFt / 3;
     return [
-        { lat: sideL, yOff: 0 },
-        { lat: -stairWidthFt/2+t,   yOff: cy },
-        { lat: -stairWidthFt/2+t*2, yOff: cy },
-        { lat: sideR, yOff: 0 }
+        { lat: sideL,                  yOff: 0,  isCenter: false },
+        { lat: -stairWidthFt / 2 + t,  yOff: cy, isCenter: true  },
+        { lat: -stairWidthFt / 2 + t*2,yOff: cy, isCenter: true  },
+        { lat: sideR,                  yOff: 0,  isCenter: false }
     ];
 }
 
@@ -141,6 +156,176 @@ function buildRailingSegment(parent, mat, x1, z1, x2, z2, surfY) {
         const balYc = surfY + RAIL.BOT + balH / 2;
         addBox(parent, mat, RAIL.BAL_SZ, balH, RAIL.BAL_SZ, bx, balYc, bz);
     }
+}
+
+// ============================================================
+// Notched (sawtooth) center stringer via ExtrudeGeometry
+//
+// Profile is built in a 2D plane where:
+//   +u  = travel direction (run, away from deck)
+//   +v  = up
+//
+// The shape traces the cut face of the stringer exactly as
+// shown in the reference photo — horizontal seat cuts and
+// vertical plumb cuts at every step, top cut flush with the
+// deck, bottom cut level with grade.
+//
+// The extrusion depth is ST.th (1.5" in feet).
+// After creation the mesh is rotated so the extrude axis
+// (originally Three.js Z) points laterally across the stair
+// width — X-axis for front/back stairs, Z-axis for left/right.
+// ============================================================
+function buildNotchedStringer(parent, mat, p, numTreads, risePerStepFt, treadDepthFt, startY) {
+    const runFt  = numTreads * treadDepthFt;
+    const riseFt = numTreads * risePerStepFt;
+
+    // ---- 2D profile (u = run axis, v = height axis) --------
+    // Origin of the shape is the top-left corner of the stringer
+    // (at the deck edge, full stringer height above bottom-of-cut).
+    const shape = new THREE.Shape();
+
+    // Top-left: where stringer meets deck header
+    shape.moveTo(0, 0);
+
+    // Walk down each step: at each step, cut a horizontal seat
+    // then a vertical plumb cut
+    for (let i = 0; i < numTreads; i++) {
+        const u = i * treadDepthFt;
+        const v = -i * risePerStepFt;
+        // Horizontal seat (tread nosing cut)
+        shape.lineTo(u + treadDepthFt, v);
+        // Vertical plumb cut (riser cut)
+        shape.lineTo(u + treadDepthFt, v - risePerStepFt);
+    }
+
+    // Bottom-right corner (at grade, end of run)
+    // already at (runFt, -riseFt) from last step
+
+    // Bottom edge back to origin column
+    shape.lineTo(0, -riseFt);
+
+    // Close back up the back face of the stringer
+    shape.lineTo(0, 0);
+
+    // ---- Extrude by stringer thickness ---------------------
+    const geom = new THREE.ExtrudeGeometry(shape, {
+        depth:           ST.th,
+        bevelEnabled:    false
+    });
+
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.castShadow = true;
+
+    // ---- Orient and position the mesh ----------------------
+    // ExtrudeGeometry extrudes along local +Z.
+    // We want the extrude axis to be the lateral (width) axis.
+    // The profile u-axis must align with the travel direction,
+    // v-axis must align with world +Y.
+    //
+    // runsX = true  → stair travels along world X (left/right edges)
+    //   profile u → world X (scaled by dirX sign)
+    //   extrude Z → world Z (lateral)
+    //   no extra rotation needed on the mesh itself;
+    //   we place it and let the parent group's rotY handle it.
+    //
+    // runsX = false → stair travels along world Z (front/back edges)
+    //   profile u → world Z (scaled by dirZ sign, which is -1 for front)
+    //   extrude Z → world X (lateral)
+    //   rotate mesh -90° around Y so local X becomes world Z travel.
+
+    const runsX = Math.abs(p.dirX) > 0.5;
+
+    if (runsX) {
+        // profile u aligns with dirX; extrude (local Z) aligns with world Z
+        // dirX = +1 (right edge): no flip needed
+        // dirX = -1 (left edge):  flip u-axis by rotating 180° around Y
+        if (p.dirX < 0) {
+            mesh.rotation.y = Math.PI;
+        }
+        // Center the extrude thickness around lat-Z
+        // Position: lat is already in Z when runsX
+        mesh.position.set(
+            p.originX + p.dirX * 0,     // u=0 starts at origin
+            startY,                      // top of stringer at startY
+            p.originZ + p.lat - ST.th / 2
+        );
+    } else {
+        // profile u must run along world -Z (front stairs: dirZ=-1)
+        // Rotate mesh 90° around Y so local +X → world -Z
+        // Then if dirZ = -1 (front) the profile naturally runs away.
+        // dirZ = +1 (back): flip by adding another 180°.
+        mesh.rotation.y = (p.dirZ > 0) ? -Math.PI / 2 : Math.PI / 2;
+        mesh.position.set(
+            p.originX + p.lat - ST.th / 2,
+            startY,
+            p.originZ + p.dirZ * 0
+        );
+    }
+
+    parent.add(mesh);
+}
+
+// ============================================================
+// Solid (angled box) side stringer — unchanged from v4.3
+// ============================================================
+function buildSolidStringer(parent, mat, p, lat, yOff) {
+    const runsX = Math.abs(p.dirX) > 0.5;
+    let x1, y1, z1, x2, y2, z2;
+    const topY = p.startY + yOff;
+    const botY = p.startY - p.riseFt + yOff;
+
+    if (runsX) {
+        x1 = p.originX;                     z1 = p.originZ + lat;
+        x2 = p.originX + p.dirX * p.runFt;  z2 = p.originZ + lat;
+    } else {
+        x1 = p.originX + lat; z1 = p.originZ;
+        x2 = p.originX + lat; z2 = p.originZ + p.dirZ * p.runFt;
+    }
+    y1 = topY;
+    y2 = botY;
+
+    const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+    const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    if (len < 0.01) return;
+
+    const geom = new THREE.BoxGeometry(ST.th, ST.w, len);
+    const m = new THREE.Mesh(geom, mat);
+    m.position.set((x1+x2)/2, (y1+y2)/2, (z1+z2)/2);
+
+    // Orient along the diagonal run vector
+    // lookAt aligns local -Z toward target; we want local Z toward (x2,y2,z2)
+    // so point away from origin
+    const dir = new THREE.Vector3(dx, dy, dz).normalize();
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    m.quaternion.copy(quaternion);
+
+    m.castShadow = true;
+    parent.add(m);
+}
+
+// ============================================================
+// buildFlightStringers — routes each stringer to the right builder
+// ============================================================
+function buildFlightStringers(p) {
+    const mat = stringerMat();
+
+    getStringerPositions(p.stairWidthFt).forEach(({ lat, yOff, isCenter }) => {
+        if (isCenter) {
+            // Pass all flight params plus this stringer's lateral position
+            buildNotchedStringer(
+                p.parentGroup,
+                mat,
+                { ...p, lat },
+                p.numTreads,
+                p.riseFt / p.numTreads,
+                p.runFt  / p.numTreads,
+                p.startY + yOff
+            );
+        } else {
+            buildSolidStringer(p.parentGroup, mat, p, lat, yOff);
+        }
+    });
 }
 
 // ============================================================
@@ -236,6 +421,7 @@ function buildStraightStair(sc, dims, g, cc, st) {
     buildFlightTreads(fp);
     buildFlightStringers({
         parentGroup: g, stairWidthFt: dims.stairWidthFeet,
+        numTreads: dims.numTreads,
         riseFt: st.deckHeight, runFt: dims.totalRunFeet,
         startY: st.deckHeight, dirZ: -1, dirX: 0, originX: 0, originZ: 0
     });
@@ -262,7 +448,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     const landingY = st.deckHeight - rise1;
     const landingCenterZ = -(ld.run1Feet + sw / 2);
 
-    // Flight 1: deck edge down to landing
+    // Flight 1
     buildFlightTreads({
         stairConfig: sc, dims, colorConfig: cc, parentGroup: g,
         numTreads: ld.treadsBeforeLanding, risePerStep: rps,
@@ -272,26 +458,25 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     });
     buildFlightStringers({
         parentGroup: g, stairWidthFt: sw,
+        numTreads: ld.treadsBeforeLanding,
         riseFt: rise1, runFt: ld.run1Feet,
         startY: st.deckHeight, dirZ: -1, dirX: 0,
         originX: 0, originZ: 0
     });
 
-    // Landing pad (square sw x sw)
+    // Landing
     buildLanding({
         parentGroup: g, colorConfig: cc,
         sizeFt: sw, landingY,
         centerX: 0, centerZ: landingCenterZ
     });
 
-    // Riser at near edge (flight 1 steps down onto landing)
     buildLandingRiser({
         parentGroup: g, colorConfig: cc,
         stairWidthFt: sw, risePerStep: rps,
         landingY, riserZ: -ld.run1Feet
     });
 
-    // Riser at side edge (flight 2 steps down off landing)
     buildLandingSideRiser({
         parentGroup: g, colorConfig: cc,
         stairWidthFt: sw, risePerStep: rps,
@@ -299,7 +484,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
         riserX: sign * sw / 2
     });
 
-    // Flight 2: exits from side edge of landing, runs in sign*X
+    // Flight 2
     const f2originX = sign * sw / 2;
     const f2originZ = landingCenterZ;
     buildFlightTreads({
@@ -311,6 +496,7 @@ function buildLShapedStair(sc, dims, g, cc, st) {
     });
     buildFlightStringers({
         parentGroup: g, stairWidthFt: sw,
+        numTreads: ld.treadsAfterLanding,
         riseFt: rise2, runFt: ld.run2Feet,
         startY: landingY, dirZ: 0, dirX: sign,
         originX: f2originX, originZ: f2originZ
@@ -400,41 +586,7 @@ function buildFlightTreads(p) {
 }
 
 // ============================================================
-// buildFlightStringers
-// ============================================================
-function buildFlightStringers(p) {
-    const runsX = Math.abs(p.dirX) > 0.5;
-    const mat   = stringerMat();
-
-    getStringerPositions(p.stairWidthFt).forEach(({ lat, yOff }) => {
-        let x1, y1, z1, x2, y2, z2;
-        const topY = p.startY + yOff;
-        const botY = p.startY - p.riseFt + yOff;
-
-        if (runsX) {
-            x1 = p.originX;                    z1 = p.originZ + lat;
-            x2 = p.originX + p.dirX * p.runFt; z2 = p.originZ + lat;
-        } else {
-            x1 = p.originX + lat; z1 = p.originZ;
-            x2 = p.originX + lat; z2 = p.originZ + p.dirZ * p.runFt;
-        }
-        y1 = topY;
-        y2 = botY;
-
-        const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
-        const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        if (len < 0.01) return;
-        const geom = new THREE.BoxGeometry(ST.th, ST.w, len);
-        const m = new THREE.Mesh(geom, mat);
-        m.position.set((x1+x2)/2, (y1+y2)/2, (z1+z2)/2);
-        m.lookAt(x2, y2, z2);
-        m.castShadow = true;
-        p.parentGroup.add(m);
-    });
-}
-
-// ============================================================
-// buildFlightHandrails (v4)
+// buildFlightHandrails
 // ============================================================
 function buildFlightHandrails(p) {
     const mat  = handrailMat();
