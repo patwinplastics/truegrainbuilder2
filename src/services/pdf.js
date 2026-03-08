@@ -24,9 +24,9 @@ const LOGO_H   = 22;
 const LOGO_PAD = 3;
 
 // ── Layout constants ──────────────────────────────────────
-const FOOTER_H    = 22;     // total footer band height (mm)
-const SNAP_MAX_H  = 52;     // max 3D snapshot height (mm) — prevents bloat
-const SNAP_MAX_W_FRAC = 1;  // snapshot uses full content width
+const FOOTER_H       = 22;   // total footer band height (mm)
+const SNAP_MAX_H     = 80;   // max 3D snapshot height (mm) — increase to show more vertical detail
+const SNAP_MAX_W_FRAC = 1;   // snapshot uses full content width
 
 export function generatePDF() {
     if (!window.jspdf?.jsPDF) { alert('PDF library not loaded. Please refresh the page.'); return; }
@@ -35,7 +35,6 @@ export function generatePDF() {
     const pw  = doc.internal.pageSize.getWidth();   // 210
     const ph  = doc.internal.pageSize.getHeight();  // 297
     const M   = 14;
-    // Body must stop before the footer band + a comfortable margin
     const BODY_MAX_Y = ph - FOOTER_H - 6;
     let y = 0;
 
@@ -45,7 +44,6 @@ export function generatePDF() {
     doc.setFillColor(...RED);
     doc.rect(0, 0, pw, 3, 'F');
 
-    // White backing card so navy-bordered logo is legible on navy header
     doc.setFillColor(...WHITE);
     doc.roundedRect(LOGO_X - LOGO_PAD, LOGO_Y - LOGO_PAD, LOGO_W + LOGO_PAD * 2, LOGO_H + LOGO_PAD * 2, 2, 2, 'F');
 
@@ -71,15 +69,14 @@ export function generatePDF() {
     y = 44;
 
     // ── 2. 3D SNAPSHOT ──────────────────────────────────────
-    // Derive height from the canvas's real pixel aspect ratio — no stretching
     try {
         const rnd = getRenderer(), cam = getCamera(), scn = getScene();
         if (rnd && cam && scn) {
             rnd.render(scn, cam);
-            const canvas  = rnd.domElement;
-            const aspect  = canvas.width / canvas.height;          // e.g. 16/9
-            const imgW    = (pw - 2 * M) * SNAP_MAX_W_FRAC;
-            const imgH    = Math.min(imgW / aspect, SNAP_MAX_H);   // respects ratio, caps height
+            const canvas = rnd.domElement;
+            const aspect = canvas.width / canvas.height;
+            const imgW   = (pw - 2 * M) * SNAP_MAX_W_FRAC;
+            const imgH   = Math.min(imgW / aspect, SNAP_MAX_H);
             doc.setDrawColor(...NAVY);
             doc.setLineWidth(0.4);
             doc.roundedRect(M, y, imgW, imgH, 2, 2, 'S');
@@ -164,19 +161,16 @@ export function generatePDF() {
     }
 
     // ── 6. DISCLAIMER ────────────────────────────────────────
-    // Clamp y so disclaimer never runs into the footer band
     const disclaimerText = 'This estimate is for material quantities only and does not include labor, permits, or installation costs. Prices subject to change without notice. Contact us for a full project quote.';
     doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(150, 150, 160);
-    const dLines    = doc.splitTextToSize(disclaimerText, pw - 2 * M);
-    const dHeight   = dLines.length * 4;                          // ~4mm per line at 7.5pt
-    const disclaimerY = Math.min(y, BODY_MAX_Y - dHeight);        // push up if too low
+    const dLines      = doc.splitTextToSize(disclaimerText, pw - 2 * M);
+    const dHeight     = dLines.length * 4;
+    const disclaimerY = Math.min(y, BODY_MAX_Y - dHeight);
     doc.text(dLines, M, disclaimerY);
 
     // ── 7. FOOTER BAND ───────────────────────────────────────
-    // Red rule
     doc.setFillColor(...RED);
     doc.rect(0, ph - FOOTER_H, pw, 1.5, 'F');
-    // Navy band
     doc.setFillColor(...NAVY);
     doc.rect(0, ph - FOOTER_H + 1.5, pw, FOOTER_H - 1.5, 'F');
 
