@@ -1,6 +1,6 @@
 /* ============================================================
    TrueGrain Deck Builder — Mobile Optimization
-   mobile.css | v1.1 | Mobile Optimization Agent
+   mobile.css | v2.0 | Mobile Optimization Agent
    ============================================================
    Breakpoints:
      < 480px      small phones (iPhone SE, older Android)
@@ -13,7 +13,7 @@
 /* ----------------------------------------------------------
    SAFE AREA INSETS
    Protects content from notch, Dynamic Island, and home bar
-   on iPhone X and later — works in Mobile Safari and Chrome iOS
+   on iPhone X and later
    ---------------------------------------------------------- */
 @supports (padding: env(safe-area-inset-bottom)) {
     .header {
@@ -36,9 +36,19 @@
 }
 
 /* ----------------------------------------------------------
+   THREE.JS CANVAS — TOUCH PASSTHROUGH (unconditional)
+   FIX #2: Moved outside media query so no Android browser
+   can steal the first pinch/orbit gesture on any viewport.
+   ---------------------------------------------------------- */
+#deckCanvas,
+.scene-container {
+    touch-action: none;
+}
+
+/* ----------------------------------------------------------
    TOUCH TARGETS
    WCAG 2.5.5 AA / Apple HIG: minimum 44x44 CSS px
-   Scoped to pointer:coarse so desktop is completely untouched
+   Scoped to pointer:coarse so desktop is untouched
    ---------------------------------------------------------- */
 @media (pointer: coarse) {
 
@@ -53,7 +63,6 @@
 
     .slider::-webkit-slider-thumb { width: 28px; height: 28px; }
     .slider::-moz-range-thumb     { width: 28px; height: 28px; }
-
     .slider { height: 8px; }
 
     .checkbox-toggle                        { min-height: 44px; align-items: center; }
@@ -69,6 +78,7 @@
     .undo-btn,
     .redo-btn { width: 44px; height: 44px; }
 
+    /* Remove 300ms tap delay + ghost tap highlight */
     .btn, .radio-card, .pattern-card, .color-swatch,
     .progress-step, .view-btn, .scene-control-btn,
     .direction-btn, .stair-edge-btn,
@@ -79,6 +89,7 @@
         -webkit-tap-highlight-color: transparent;
     }
 
+    /* Prevent long-press text-selection on interactive cards */
     .progress-step, .pattern-card, .radio-card,
     .direction-btn, .stair-edge-btn,
     .color-swatch, .view-btn, .btn {
@@ -88,31 +99,20 @@
 }
 
 /* ----------------------------------------------------------
-   THREE.JS CANVAS — UNCONDITIONAL
-   touch-action:none must be applied regardless of screen size
-   so pinch-to-zoom and orbit gestures are never intercepted
-   by the browser before the media query resolves.
-   ---------------------------------------------------------- */
-#deckCanvas,
-.scene-container {
-    touch-action: none;
-}
-
-/* ----------------------------------------------------------
-   STEP CONTENT SCROLL
-   Contain overscroll on both axes:
-     Y — prevents rubber-band fighting the fixed wizard-nav footer
-     X — prevents Android Chrome back/forward swipe navigation
+   SCROLL CONTAINMENT
+   FIX #6: overscroll-behavior-x prevents Android Chrome
+   back/forward swipe from triggering inside the wizard.
+   FIX #7: smooth scroll + momentum for iOS rubber-band.
    ---------------------------------------------------------- */
 .step-content {
-    overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
+    overscroll-behavior-x: none;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
 }
 
 /* ----------------------------------------------------------
    WALKTHROUGH HUD OVERFLOW FIX
-   min-width: 340px was overflowing on 375px iPhone and below
    ---------------------------------------------------------- */
 @media (max-width: 767px) {
     .wt-hud__inner {
@@ -122,19 +122,24 @@
 }
 
 /* ----------------------------------------------------------
-   JOYSTICK BASE — SE CLAMP
-   Prevents the 110px joystick base from clipping off-screen
-   on 375px iPhones (iPhone SE 2nd/3rd gen).
-   left: 40px on wide phones, scales down on narrow ones.
+   FIX #4: JOYSTICK — CLAMP FOR SMALL PHONES
+   On iPhone SE (375px) the base at left:40px clips.
    ---------------------------------------------------------- */
-@media (max-width: 1023px) {
+@media (max-width: 399px) {
     #wtJsBase {
-        left: min(40px, 5vw);
+        left: min(40px, 5vw) !important;
+        width: 96px !important;
+        height: 96px !important;
+    }
+    #wtJsKnob {
+        width: 38px !important;
+        height: 38px !important;
     }
 }
 
 /* ----------------------------------------------------------
    SMALL PHONES  (< 480px)
+   iPhone SE (2nd/3rd gen), Galaxy A series, Moto G
    ---------------------------------------------------------- */
 @media (max-width: 479px) {
 
@@ -178,8 +183,9 @@
 }
 
 /* ----------------------------------------------------------
-   LARGE PHONES  (480px - 639px)
-   iPhone 14 / 15 Pro, Galaxy S series, Pixel 7+
+   LARGE PHONES  (480px – 639px)
+   iPhone 14/15 Pro, Galaxy S series, Pixel 7+
+   FIX #8: export buttons now stack full-width here too
    ---------------------------------------------------------- */
 @media (min-width: 480px) and (max-width: 639px) {
 
@@ -187,14 +193,12 @@
 
     .pattern-cards { grid-template-columns: repeat(2, 1fr); }
 
-    /* FIX: export buttons full-width stacked on large phones too */
     .export-actions      { flex-direction: column; }
     .export-actions .btn { width: 100%; min-height: 48px; }
 }
 
 /* ----------------------------------------------------------
-   640px - 767px
-   Landscape iPhones, small Android tablets in portrait
+   640px – 767px  (landscape phones / small tablets)
    Force side-by-side so 3D preview and wizard are both visible
    ---------------------------------------------------------- */
 @media (min-width: 640px) and (max-width: 767px) {
@@ -227,7 +231,7 @@
 
 /* ----------------------------------------------------------
    LANDSCAPE PHONES
-   Wide (> 480px) but short (< 500px tall)
+   Wide but short: force side-by-side + compact controls
    ---------------------------------------------------------- */
 @media (max-width: 900px) and (max-height: 499px) and (orientation: landscape) {
 
@@ -281,6 +285,7 @@
 
 /* ----------------------------------------------------------
    KEYBOARD NAVIGATION ON TABLETS
+   Restore visible focus rings for iPad + physical keyboard
    ---------------------------------------------------------- */
 @media (pointer: fine) {
     .btn:focus-visible,
@@ -293,13 +298,11 @@
 }
 
 /* ----------------------------------------------------------
-   REDUCED MOTION
-   Disable transitions and animations for users who have
-   enabled "Reduce Motion" in iOS/Android accessibility settings.
-   Prevents vestibular disorder triggers.
+   FIX #3: PREFERS-REDUCED-MOTION
+   Disable transitions/animations for users with vestibular
+   disorders. Keeps layout shifts instant.
    ---------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-
     *,
     *::before,
     *::after {
@@ -309,14 +312,5 @@
         scroll-behavior: auto !important;
     }
 
-    /* Keep spinner visible but stop spinning */
-    .spinner {
-        animation: none !important;
-        border-top-color: var(--color-primary, #1B2B4D);
-    }
-
-    /* Walkthrough HUD fade — instant instead of 0.3s */
-    #walkthroughHUD {
-        transition: none !important;
-    }
+    #walkthroughHUD { transition: none; }
 }
