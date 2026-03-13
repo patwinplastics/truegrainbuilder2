@@ -11,6 +11,8 @@ import { createRealisticGrass, createSupportPosts,
 import { createDeckBoardsWithSegments }                       from './deck-boards.js';
 import { createDetailedRailings }                             from './railings.js';
 import { createAllStairs }                                    from './stairs-3d.js';
+import { createAllAccessories }                               from './accessories.js';
+import { initStairDrag }                                      from './stair-drag.js';
 import { determinePattern }                                   from '../calc/estimator.js';
 import {
     initWalkthrough,
@@ -160,6 +162,7 @@ export function initScene() {
     animate();
 
     initWalkthrough(camera, renderer, controls);
+    initStairDrag(scene, camera, renderer, controls);
     _bindWalkButton();
 
     window.addEventListener('resize', debounce(onWindowResize, 250));
@@ -229,6 +232,7 @@ function executeBuildDeck() {
         createWhiteFascia(deckGroup, state);
         if (state.showRailings)                              createDetailedRailings(deckGroup, state);
         if (state.stairsEnabled && state.stairs?.length > 0) createAllStairs(deckGroup, state);
+        if (state.accessories?.length > 0) createAllAccessories(deckGroup, state);
 
         // Tighten shadow frustum to deck bounds for maximum shadow resolution
         const sun = scene?.userData.sun;

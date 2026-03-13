@@ -23,6 +23,8 @@ export const state = {
     stairs: [],
     stairsEnabled: false,
     selectedStairId: null,
+    // Accessories (plants & benches)
+    accessories: [],
     // Estimate options
     wastePercent: CONFIG.waste.default,
     pricePerLF: CONFIG.pricing.materialPerLF.default,

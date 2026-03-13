@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="main.css">
     <link rel="stylesheet" href="stair-styles.css">
+    <link rel="stylesheet" href="accessory-styles.css">
     <link rel="stylesheet" href="mobile.css">
     <style>
         .wizard-step        { display: none; }
@@ -362,6 +363,34 @@
                                 </div>
                                 <button type="button" class="btn btn--danger btn--small" id="deleteStairBtn" style="width:100%;margin-top:12px">Remove This Stair</button>
                             </div>
+                        </div>
+
+                        <!-- Accessories (Plants & Benches) -->
+                        <div class="form-group" style="margin-top: var(--spacing-lg);">
+                            <h3 class="step__subtitle" style="font-size:var(--font-size-base);font-weight:600;margin:0 0 var(--spacing-sm) 0">Deck Accessories</h3>
+                            <p class="form-hint">Add decorative plants and benches to your deck visualization.</p>
+                        </div>
+
+                        <div class="accessory-panel">
+                            <div class="accessory-list" id="accessoryList">
+                                <div class="accessory-list-empty">No accessories placed. Use the buttons below to add plants or benches to your deck.</div>
+                            </div>
+
+                            <div class="accessory-add-controls">
+                                <span class="accessory-add-label">Plants</span>
+                                <div class="accessory-buttons">
+                                    <button type="button" class="accessory-add-btn" data-add-accessory="potted-plant">&#x1F331; Potted Plant</button>
+                                    <button type="button" class="accessory-add-btn" data-add-accessory="tall-planter">&#x1F332; Tall Planter</button>
+                                    <button type="button" class="accessory-add-btn" data-add-accessory="flower-box">&#x1F33A; Flower Box</button>
+                                </div>
+                                <span class="accessory-add-label" style="margin-top:var(--spacing-sm)">Benches</span>
+                                <div class="accessory-buttons">
+                                    <button type="button" class="accessory-add-btn" data-add-accessory="backless-bench">&#x1FA91; Backless Bench</button>
+                                    <button type="button" class="accessory-add-btn" data-add-accessory="bench-with-back">&#x1FA91; Bench with Back</button>
+                                </div>
+                            </div>
+
+                            <button type="button" class="btn btn--secondary btn--small" id="clearAccessoriesBtn" style="width:100%;margin-top:var(--spacing-sm)">Clear All Accessories</button>
                         </div>
                     </section>
 

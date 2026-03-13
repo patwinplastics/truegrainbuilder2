@@ -12,6 +12,7 @@ import { updateUI }                                   from './ui/updates.js';
 import { initColorSwatches }                          from './ui/swatches.js';
 import { goToStep, initProgressNav }                  from './ui/wizard.js';
 import { initStairUI }                                from './ui/stair-ui.js';
+import { initAccessoriesUI }                          from './ui/accessories-ui.js';
 import { submitQuote }                                from './services/quote.js';
 import { generatePDF }                                from './services/pdf.js';
 
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initColorSwatches();
     initProgressNav();
     initStairUI();
+    initAccessoriesUI();
     bindEventListeners();
     goToStep(state.currentStep);
 });

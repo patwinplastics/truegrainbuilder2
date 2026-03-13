@@ -1,0 +1,118 @@
+/* ==============================================================
+   TrueGrain Deck Builder 2 — Accessory UI Styles
+   ============================================================== */
+
+.accessory-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: var(--spacing-md);
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+}
+
+.accessory-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-md);
+}
+
+.accessory-list-empty {
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1.5px dashed var(--color-border);
+    line-height: 1.5;
+}
+
+.accessory-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+}
+
+.accessory-item__icon {
+    font-size: 1.1em;
+    flex-shrink: 0;
+}
+
+.accessory-item__label {
+    flex: 1;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.accessory-item .btn--danger.btn--small {
+    flex-shrink: 0;
+    opacity: 0.65;
+    transition: opacity var(--transition-fast);
+}
+
+.accessory-item:hover .btn--danger.btn--small {
+    opacity: 1;
+}
+
+.accessory-add-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.accessory-add-label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.accessory-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xs);
+}
+
+.accessory-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: var(--spacing-sm) var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    font-family: inherit;
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--color-text);
+    transition: all var(--transition-fast);
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.accessory-add-btn:hover {
+    border-color: var(--color-primary-light);
+    background: rgba(27, 43, 77, 0.04);
+    color: var(--color-primary);
+}
+
+.accessory-add-btn:active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-surface);
+}
+
+@media (max-width: 767px) {
+    .accessory-buttons {
+        grid-template-columns: 1fr 1fr;
+    }
+}
