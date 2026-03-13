@@ -171,7 +171,7 @@
                         <h2 class="step__title">Deck Dimensions</h2>
                         <p class="step__desc">Enter the length and width of your deck in feet.</p>
                         <div class="form-group">
-                            <label class="form-label">Length (feet)</label>
+                            <label class="form-label" for="lengthInput">Length (feet)</label>
                             <div class="slider-input">
                                 <input type="range" id="lengthSlider" class="slider" min="8" max="40" value="16" step="1">
                                 <input type="number" id="lengthInput" class="number-input" min="8" max="40" value="16" inputmode="numeric">
@@ -179,7 +179,7 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Width (feet)</label>
+                            <label class="form-label" for="widthInput">Width (feet)</label>
                             <div class="slider-input">
                                 <input type="range" id="widthSlider" class="slider" min="8" max="30" value="12" step="1">
                                 <input type="number" id="widthInput" class="number-input" min="8" max="30" value="12" inputmode="numeric">
@@ -187,7 +187,7 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Deck Height (feet)</label>
+                            <label class="form-label" for="heightInput">Deck Height (feet)</label>
                             <div class="slider-input">
                                 <input type="range" id="heightSlider" class="slider" min="0.5" max="8" value="2" step="0.5">
                                 <input type="number" id="heightInput" class="number-input" min="0.5" max="8" value="2" step="0.5" inputmode="decimal">
@@ -209,16 +209,16 @@
                         <h2 class="step__title">Structure Options</h2>
                         <p class="step__desc">Configure how your boards will be installed.</p>
                         <div class="form-group">
-                            <label class="form-label">Board Direction</label>
+                            <label class="form-label" for="boardDirLength">Board Direction</label>
                             <div class="radio-cards radio-cards--inline">
-                                <label class="radio-card radio-card--small selected"><input type="radio" name="boardDirection" value="length" checked><span>Lengthwise</span></label>
+                                <label class="radio-card radio-card--small selected"><input type="radio" name="boardDirection" id="boardDirLength" value="length" checked><span>Lengthwise</span></label>
                                 <label class="radio-card radio-card--small"><input type="radio" name="boardDirection" value="width"><span>Widthwise</span></label>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Joist Spacing</label>
+                            <label class="form-label" for="joistSpacing16">Joist Spacing</label>
                             <div class="radio-cards radio-cards--inline">
-                                <label class="radio-card radio-card--small selected"><input type="radio" name="joistSpacing" value="16" checked><span>16" O.C.</span></label>
+                                <label class="radio-card radio-card--small selected"><input type="radio" name="joistSpacing" id="joistSpacing16" value="16" checked><span>16" O.C.</span></label>
                                 <label class="radio-card radio-card--small"><input type="radio" name="joistSpacing" value="12"><span>12" O.C.</span></label>
                             </div>
                             <p class="form-hint">Standard is 16" on center. Use 12" for diagonal patterns or extra support.</p>
@@ -246,7 +246,7 @@
                             </div>
                         </div>
                         <div class="form-group hidden" id="borderWidthSection">
-                            <label class="form-label">Border Width (boards)</label>
+                            <label class="form-label" for="borderWidthInput">Border Width (boards)</label>
                             <div class="slider-input">
                                 <input type="range" id="borderWidthSlider" class="slider" min="1" max="3" value="1" step="1">
                                 <input type="number" id="borderWidthInput" class="number-input" min="1" max="3" value="1" inputmode="numeric">
@@ -267,8 +267,8 @@
                         <h2 class="step__title">Select Color</h2>
                         <p class="step__desc">Choose from our premium TrueGrain colors.</p>
                         <div class="form-group">
-                            <label class="form-label">Main Board Color</label>
-                            <div class="color-swatches" id="mainColorSwatches"></div>
+                            <label class="form-label" id="mainColorLabel">Main Board Color</label>
+                            <div class="color-swatches" id="mainColorSwatches" role="radiogroup" aria-labelledby="mainColorLabel"></div>
                         </div>
                     </section>
 
@@ -300,7 +300,7 @@
                             <div class="stair-editor hidden" id="stairEditor">
                                 <h4 class="stair-editor-title">Edit Stair: <span id="stairEditorEdge"></span></h4>
                                 <div class="form-group">
-                                    <label class="form-label">Stair Width (feet)</label>
+                                    <label class="form-label" for="stairWidthInput">Stair Width (feet)</label>
                                     <div class="slider-input">
                                         <input type="range" id="stairWidthSlider" class="slider" min="3" max="8" value="4" step="0.5">
                                         <input type="number" id="stairWidthInput" class="number-input" min="3" max="8" value="4" step="0.5" inputmode="decimal">
@@ -309,9 +309,9 @@
                                     <p class="form-hint">Minimum 36" for code compliance.</p>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Boards Per Tread</label>
+                                    <label class="form-label" for="boardsPerTread1">Boards Per Tread</label>
                                     <div class="radio-cards radio-cards--inline">
-                                        <label class="radio-card radio-card--small"><input type="radio" name="boardsPerTread" value="1"><span>1</span></label>
+                                        <label class="radio-card radio-card--small"><input type="radio" name="boardsPerTread" id="boardsPerTread1" value="1"><span>1</span></label>
                                         <label class="radio-card radio-card--small selected"><input type="radio" name="boardsPerTread" value="2" checked><span>2</span></label>
                                         <label class="radio-card radio-card--small"><input type="radio" name="boardsPerTread" value="3"><span>3</span></label>
                                     </div>
@@ -320,17 +320,17 @@
                                     <div class="stair-info-row"><span class="stair-info-label">Tread Depth:</span><span class="stair-info-value" id="treadDepthDisplay">11"</span></div>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Stair Shape</label>
+                                    <label class="form-label" for="stairShapeStraight">Stair Shape</label>
                                     <div class="radio-cards radio-cards--inline">
-                                        <label class="radio-card radio-card--small selected"><input type="radio" name="stairShape" value="straight" checked><span>Straight</span></label>
+                                        <label class="radio-card radio-card--small selected"><input type="radio" name="stairShape" id="stairShapeStraight" value="straight" checked><span>Straight</span></label>
                                         <label class="radio-card radio-card--small"><input type="radio" name="stairShape" value="l-shape"><span>L-Shape</span></label>
                                     </div>
                                 </div>
                                 <div class="l-shape-options hidden" id="lShapeOptions">
                                     <div class="form-group">
-                                        <label class="form-label">Turn Direction</label>
+                                        <label class="form-label" for="stairTurnLeft">Turn Direction</label>
                                         <div class="radio-cards radio-cards--inline">
-                                            <label class="radio-card radio-card--small"><input type="radio" name="stairTurnDirection" value="left"><span>Turn Left</span></label>
+                                            <label class="radio-card radio-card--small"><input type="radio" name="stairTurnDirection" id="stairTurnLeft" value="left"><span>Turn Left</span></label>
                                             <label class="radio-card radio-card--small selected"><input type="radio" name="stairTurnDirection" value="right" checked><span>Turn Right</span></label>
                                         </div>
                                     </div>
@@ -403,7 +403,7 @@
                         <h2 class="step__title">Material Estimate</h2>
                         <p class="step__desc">Review your estimated materials and costs.</p>
                         <div class="form-group">
-                            <label class="form-label">Waste Factor</label>
+                            <label class="form-label" for="wasteInput">Waste Factor</label>
                             <div class="slider-input">
                                 <input type="range" id="wasteSlider" class="slider" min="5" max="20" value="10" step="1">
                                 <input type="number" id="wasteInput" class="number-input" min="5" max="20" value="10" inputmode="numeric">
@@ -412,10 +412,10 @@
                             <p class="form-hint">Industry standard is 10%.</p>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Price Per Linear Foot</label>
+                            <label class="form-label" for="priceInput">Price Per Linear Foot</label>
                             <div class="slider-input">
                                 <input type="range" id="priceSlider" class="slider" min="7" max="13" value="10" step="0.25">
-                                <input type="number" id="priceInput" class="number-input" min="2" max="10" value="6" step="0.25" inputmode="decimal">
+                                <input type="number" id="priceInput" class="number-input" min="7" max="13" value="10" step="0.25" inputmode="decimal">
                                 <span class="unit">$/LF</span>
                             </div>
                         </div>
@@ -502,11 +502,11 @@
                         </div>
                         <div class="contact-form">
                             <h3>Get a Quote</h3>
-                            <div class="form-group"><label class="form-label">Name</label><input type="text" id="contactName" class="text-input" placeholder="Your name" autocomplete="name" enterkeyhint="next"></div>
-                            <div class="form-group"><label class="form-label">Email</label><input type="email" id="contactEmail" class="text-input" placeholder="you@email.com" autocomplete="email" enterkeyhint="next"></div>
+                            <div class="form-group"><label class="form-label" for="contactName">Name</label><input type="text" id="contactName" class="text-input" placeholder="Your name" autocomplete="name" enterkeyhint="next"></div>
+                            <div class="form-group"><label class="form-label" for="contactEmail">Email</label><input type="email" id="contactEmail" class="text-input" placeholder="you@email.com" autocomplete="email" enterkeyhint="next"></div>
                             <div class="form-row">
-                                <div class="form-group"><label class="form-label">Phone</label><input type="tel" id="contactPhone" class="text-input" placeholder="555-123-4567" autocomplete="tel" inputmode="tel" enterkeyhint="next"></div>
-                                <div class="form-group"><label class="form-label">ZIP Code</label><input type="text" id="contactZip" class="text-input" placeholder="12345" autocomplete="postal-code" inputmode="numeric" enterkeyhint="done"></div>
+                                <div class="form-group"><label class="form-label" for="contactPhone">Phone</label><input type="tel" id="contactPhone" class="text-input" placeholder="555-123-4567" autocomplete="tel" inputmode="tel" enterkeyhint="next"></div>
+                                <div class="form-group"><label class="form-label" for="contactZip">ZIP Code</label><input type="text" id="contactZip" class="text-input" placeholder="12345" autocomplete="postal-code" inputmode="numeric" enterkeyhint="done"></div>
                             </div>
                         </div>
                         <div class="export-actions">
@@ -566,10 +566,10 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" integrity="sha384-wagZhIFgY4hD+7awjQjR4e2E294y6J2HSnd8eTNc15ZubTeQeVRZwhQJ+W6hnBsf" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js" integrity="sha384-LTJYdm72qrDeAPFxA/Lfb4ahM8zwiJBErxAUYXzmA60gmBPjN8+1hLAmrAf05TCw" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
     <script type="module" src="src/main.js"></script>
 </body>
 </html>
