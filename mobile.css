@@ -78,12 +78,15 @@
     .undo-btn,
     .redo-btn { width: 44px; height: 44px; }
 
+    .accessory-add-btn { min-height: 48px; }
+
     /* Remove 300ms tap delay + ghost tap highlight */
     .btn, .radio-card, .pattern-card, .color-swatch,
     .progress-step, .view-btn, .scene-control-btn,
     .direction-btn, .stair-edge-btn,
     .stair-edit-btn, .stair-delete-btn,
     .undo-btn, .redo-btn,
+    .accessory-add-btn,
     .header__help-btn, #walkBtn {
         touch-action: manipulation;
         -webkit-tap-highlight-color: transparent;
@@ -92,7 +95,8 @@
     /* Prevent long-press text-selection on interactive cards */
     .progress-step, .pattern-card, .radio-card,
     .direction-btn, .stair-edge-btn,
-    .color-swatch, .view-btn, .btn {
+    .color-swatch, .view-btn, .btn,
+    .accessory-add-btn, .accessory-item {
         -webkit-user-select: none;
         user-select: none;
     }

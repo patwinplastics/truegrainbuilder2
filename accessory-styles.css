@@ -115,4 +115,31 @@
     .accessory-buttons {
         grid-template-columns: 1fr 1fr;
     }
+
+    .accessory-add-btn {
+        min-height: 44px;
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-size-sm);
+    }
+
+    .accessory-item {
+        min-height: 44px;
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .accessory-item .btn--danger.btn--small {
+        min-width: 36px;
+        min-height: 36px;
+        opacity: 1;
+    }
+}
+
+@media (max-width: 479px) {
+    .accessory-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .accessory-panel {
+        padding: var(--spacing-sm);
+    }
 }

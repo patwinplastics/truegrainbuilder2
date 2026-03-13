@@ -41,14 +41,15 @@ function renderAccessoryList() {
     if (!list) return;
 
     if (!state.accessories?.length) {
-        list.innerHTML = '<div class="accessory-list-empty">No accessories placed. Use the buttons below to add plants or benches to your deck.</div>';
+        list.innerHTML = '<div class="accessory-list-empty">No accessories placed. Use the buttons below to add plants, benches, or a dog to your deck.</div>';
         return;
     }
 
     list.innerHTML = state.accessories.map(acc => {
         const reg = ACCESSORY_TYPES[acc.type];
         const label = reg?.label || acc.type;
-        const icon = reg?.category === 'plant' ? '&#x1F331;' : '&#x1FA91;';
+        const catIcons = { plant: '&#x1F331;', bench: '&#x1FA91;', dog: '&#x1F415;' };
+        const icon = catIcons[reg?.category] || '&#x2B50;';
         return `
         <div class="accessory-item" data-acc-id="${acc.id}">
             <span class="accessory-item__icon">${icon}</span>

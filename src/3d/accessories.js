@@ -79,6 +79,55 @@ function getMetalLegMat() {
     return materialCache['_metalleg'];
 }
 
+// Golden retriever materials
+function getGoldenFurMat() {
+    if (!materialCache['_golden_fur'])
+        materialCache['_golden_fur'] = new THREE.MeshStandardMaterial({
+            color: 0xDAA520, roughness: 0.92, metalness: 0.0
+        });
+    return materialCache['_golden_fur'];
+}
+
+function getLightFurMat() {
+    if (!materialCache['_light_fur'])
+        materialCache['_light_fur'] = new THREE.MeshStandardMaterial({
+            color: 0xE8C55A, roughness: 0.90, metalness: 0.0
+        });
+    return materialCache['_light_fur'];
+}
+
+function getDarkFurMat() {
+    if (!materialCache['_dark_fur'])
+        materialCache['_dark_fur'] = new THREE.MeshStandardMaterial({
+            color: 0xB8860B, roughness: 0.92, metalness: 0.0
+        });
+    return materialCache['_dark_fur'];
+}
+
+function getNoseMat() {
+    if (!materialCache['_dog_nose'])
+        materialCache['_dog_nose'] = new THREE.MeshStandardMaterial({
+            color: 0x1A1A1A, roughness: 0.6, metalness: 0.1
+        });
+    return materialCache['_dog_nose'];
+}
+
+function getEyeMat() {
+    if (!materialCache['_dog_eye'])
+        materialCache['_dog_eye'] = new THREE.MeshStandardMaterial({
+            color: 0x2B1810, roughness: 0.4, metalness: 0.15
+        });
+    return materialCache['_dog_eye'];
+}
+
+function getTongueMat() {
+    if (!materialCache['_dog_tongue'])
+        materialCache['_dog_tongue'] = new THREE.MeshStandardMaterial({
+            color: 0xE8838A, roughness: 0.7, metalness: 0.0
+        });
+    return materialCache['_dog_tongue'];
+}
+
 // ============================================================
 // Plant types
 // ============================================================
@@ -374,6 +423,122 @@ function createBenchWithBack() {
 }
 
 // ============================================================
+// Golden Retriever
+// ============================================================
+
+/**
+ * Golden Retriever — whimsical low-poly dog built from basic geometry
+ * ~2ft long, ~1.5ft tall at head
+ */
+function createGoldenRetriever() {
+    const group = new THREE.Group();
+    const fur     = getGoldenFurMat();
+    const light   = getLightFurMat();
+    const dark    = getDarkFurMat();
+    const noseMat = getNoseMat();
+    const eyeMat  = getEyeMat();
+    const tongue  = getTongueMat();
+
+    // Body — elongated ellipsoid (scaled sphere)
+    const bodyGeo = new THREE.SphereGeometry(0.45, 12, 10);
+    bodyGeo.scale(1.8, 1, 1);       // elongate along X
+    const body = new THREE.Mesh(bodyGeo, fur);
+    body.position.set(0, 0.65, 0);
+    body.castShadow = true;
+    group.add(body);
+
+    // Chest — slightly lighter, forward bulge
+    const chestGeo = new THREE.SphereGeometry(0.38, 10, 8);
+    chestGeo.scale(1, 1.05, 1);
+    const chest = new THREE.Mesh(chestGeo, light);
+    chest.position.set(0.5, 0.6, 0);
+    chest.castShadow = true;
+    group.add(chest);
+
+    // Head — sphere
+    const headGeo = new THREE.SphereGeometry(0.32, 10, 8);
+    const head = new THREE.Mesh(headGeo, fur);
+    head.position.set(0.85, 1.0, 0);
+    head.castShadow = true;
+    group.add(head);
+
+    // Snout — small elongated box
+    const snoutGeo = new THREE.BoxGeometry(0.28, 0.16, 0.2);
+    const snout = new THREE.Mesh(snoutGeo, light);
+    snout.position.set(1.12, 0.92, 0);
+    snout.castShadow = true;
+    group.add(snout);
+
+    // Nose — tiny sphere at tip of snout
+    const noseGeo = new THREE.SphereGeometry(0.055, 6, 5);
+    const nose = new THREE.Mesh(noseGeo, noseMat);
+    nose.position.set(1.27, 0.95, 0);
+    group.add(nose);
+
+    // Eyes
+    const eyeGeo = new THREE.SphereGeometry(0.045, 6, 5);
+    [-0.12, 0.12].forEach(z => {
+        const eye = new THREE.Mesh(eyeGeo, eyeMat);
+        eye.position.set(1.08, 1.08, z);
+        group.add(eye);
+    });
+
+    // Ears — flattened spheres, drooping
+    const earGeo = new THREE.SphereGeometry(0.16, 7, 6);
+    earGeo.scale(0.6, 1, 0.8);
+    [-0.28, 0.28].forEach(z => {
+        const ear = new THREE.Mesh(earGeo, dark);
+        ear.position.set(0.72, 0.95, z);
+        ear.rotation.x = z > 0 ? 0.3 : -0.3;
+        ear.rotation.z = z > 0 ? -0.2 : 0.2;
+        ear.castShadow = true;
+        group.add(ear);
+    });
+
+    // Legs — 4 cylinders
+    const legGeo = new THREE.CylinderGeometry(0.07, 0.065, 0.5, 7);
+    const legPositions = [
+        [ 0.5, 0.25,  0.18],   // front-right
+        [ 0.5, 0.25, -0.18],   // front-left
+        [-0.45, 0.25,  0.18],  // back-right
+        [-0.45, 0.25, -0.18],  // back-left
+    ];
+    legPositions.forEach(([x, y, z]) => {
+        const leg = new THREE.Mesh(legGeo, fur);
+        leg.position.set(x, y, z);
+        leg.castShadow = true;
+        group.add(leg);
+    });
+
+    // Paws — small flattened spheres at leg bottoms
+    const pawGeo = new THREE.SphereGeometry(0.08, 6, 5);
+    pawGeo.scale(1.1, 0.5, 1);
+    legPositions.forEach(([x, , z]) => {
+        const paw = new THREE.Mesh(pawGeo, dark);
+        paw.position.set(x, 0.03, z);
+        group.add(paw);
+    });
+
+    // Tail — tapered cone, slightly raised and curved
+    const tailGeo = new THREE.ConeGeometry(0.07, 0.55, 6);
+    const tail = new THREE.Mesh(tailGeo, fur);
+    tail.position.set(-0.9, 0.95, 0);
+    tail.rotation.z = Math.PI / 3;   // angled upward
+    tail.castShadow = true;
+    group.add(tail);
+
+    // Tongue — tiny flat box sticking out below snout
+    const tongueGeo = new THREE.BoxGeometry(0.1, 0.025, 0.07);
+    const tongueM = new THREE.Mesh(tongueGeo, tongue);
+    tongueM.position.set(1.2, 0.83, 0);
+    group.add(tongueM);
+
+    group.userData.accessoryType = 'golden-retriever';
+    group.userData.label = 'Golden Retriever';
+    return group;
+}
+
+// ============================================================
 // Registry of accessory types
 // ============================================================
 export const ACCESSORY_TYPES = {
@@ -382,6 +547,7 @@ export const ACCESSORY_TYPES = {
     'flower-box':     { label: 'Flower Box',     category: 'plant', create: createFlowerBox },
     'backless-bench': { label: 'Backless Bench', category: 'bench', create: createBacklessBench },
     'bench-with-back':{ label: 'Bench with Back',category: 'bench', create: createBenchWithBack },
+    'golden-retriever':{ label: 'Golden Retriever', category: 'dog', create: createGoldenRetriever },
 };
 
 // ============================================================

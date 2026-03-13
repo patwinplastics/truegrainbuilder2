@@ -13,6 +13,7 @@ import { createDetailedRailings }                             from './railings.j
 import { createAllStairs }                                    from './stairs-3d.js';
 import { createAllAccessories }                               from './accessories.js';
 import { initStairDrag }                                      from './stair-drag.js';
+import { initAccessoryDrag }                                  from './accessory-drag.js';
 import { determinePattern }                                   from '../calc/estimator.js';
 import {
     initWalkthrough,
@@ -163,6 +164,7 @@ export function initScene() {
 
     initWalkthrough(camera, renderer, controls);
     initStairDrag(scene, camera, renderer, controls);
+    initAccessoryDrag(scene, camera, renderer, controls);
     _bindWalkButton();
 
     window.addEventListener('resize', debounce(onWindowResize, 250));
