@@ -153,6 +153,7 @@ function _onUnlock() {
     _crouching = false;
     _eyeHeight = EYE_STAND;
     _resetCamera();
+    if (_plc) _plc.dispose();
     _plc = null;
 }
 
@@ -287,7 +288,7 @@ function _addStairSurfaces(sc, dims) {
             const c = toWorld(0, -((i + 1) * tdf));
             _surfaces.push({ minX: c.x - swH, maxX: c.x + swH, minZ: c.z - tdf, maxZ: c.z + tdf, y: state.deckHeight - (i + 1) * rps + BOARD_TH });
         }
-        const ldf = ld.landingDepthFeet;
+        const ldf = ld.landingSizeFeet;
         const cl  = toWorld(sign * ld.run2Feet / 2, -(ld.run1Feet + ldf / 2));
         const lw  = dims.stairWidthFeet + ld.run2Feet;
         _surfaces.push({ minX: cl.x - lw / 2, maxX: cl.x + lw / 2, minZ: cl.z - ldf / 2, maxZ: cl.z + ldf / 2, y: landY + BOARD_TH });

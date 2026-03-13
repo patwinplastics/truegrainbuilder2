@@ -12,8 +12,8 @@ import { createDeckBoardsWithSegments }                       from './deck-board
 import { createDetailedRailings }                             from './railings.js';
 import { createAllStairs }                                    from './stairs-3d.js';
 import { createAllAccessories }                               from './accessories.js';
-import { initStairDrag }                                      from './stair-drag.js';
-import { initAccessoryDrag }                                  from './accessory-drag.js';
+import { initStairDrag, disposeStairDrag }                     from './stair-drag.js';
+import { initAccessoryDrag, disposeAccessoryDrag }             from './accessory-drag.js';
 import { determinePattern }                                   from '../calc/estimator.js';
 import {
     initWalkthrough,
@@ -30,6 +30,7 @@ let sceneInitialized = false;
 let isBuilding       = false;
 let pendingBuild     = false;
 let contextLost      = false;
+let _listenersAttached = false;
 
 export const getScene    = () => scene;
 export const getCamera   = () => camera;
@@ -69,17 +70,22 @@ export function initScene() {
         return;
     }
 
-    canvas.addEventListener('webglcontextlost', e => {
-        e.preventDefault();
-        contextLost = true;
-        sceneInitialized = false;
-    });
-    canvas.addEventListener('webglcontextrestored', () => {
-        contextLost = false;
-        disposeAllCaches();
-        sceneInitialized = false;
-        initScene();
-    });
+    if (!_listenersAttached) {
+        canvas.addEventListener('webglcontextlost', e => {
+            e.preventDefault();
+            contextLost = true;
+            sceneInitialized = false;
+            disposeStairDrag();
+            disposeAccessoryDrag();
+            exitWalkthrough();
+        });
+        canvas.addEventListener('webglcontextrestored', () => {
+            contextLost = false;
+            disposeAllCaches();
+            sceneInitialized = false;
+            initScene();
+        });
+    }
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
@@ -165,10 +171,13 @@ export function initScene() {
     initWalkthrough(camera, renderer, controls);
     initStairDrag(scene, camera, renderer, controls);
     initAccessoryDrag(scene, camera, renderer, controls);
-    _bindWalkButton();
 
-    window.addEventListener('resize', debounce(onWindowResize, 250));
-    window.addEventListener('beforeunload', disposeAllCaches);
+    if (!_listenersAttached) {
+        _bindWalkButton();
+        window.addEventListener('resize', debounce(onWindowResize, 250));
+        window.addEventListener('beforeunload', disposeAllCaches);
+        _listenersAttached = true;
+    }
 }
 
 // ============================================================
@@ -214,7 +223,16 @@ export function buildDeck() { debouncedBuild(); }
 
 function disposeGroupChildren(group) {
     group.traverse(child => {
-        if (child.isMesh) child.geometry?.dispose();
+        if (child.isMesh) {
+            child.geometry?.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(m => m.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            }
+        }
     });
     while (group.children.length > 0) group.remove(group.children[0]);
 }
